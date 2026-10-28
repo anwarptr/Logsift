@@ -1,0 +1,74 @@
+.sidebar-close {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    position: relative;
+  }
+  /* Sidebar and detail panel become overlays so the table keeps the full width. */
+  .sidebar-wrap {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(320px, 88vw);
+    box-shadow: var(--shadow);
+  }
+  .sidebar-close {
+    display: block;
+    margin: 6px 8px 0 auto;
+  }
+  .detail-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 31;
+    width: min(440px, 100vw);
+    box-shadow: var(--shadow);
+  }
+  .file-name {
+    max-width: 160px;
+  }
+  .search-box {
+    order: 10;
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-header,
+  .file-info,
+  .table-toolbar,
+  .filter-chips {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .insights-wrap.open {
+    max-height: 55vh;
+  }
+  .card-value {
+    font-size: 17px;
+  }
+  .detail-field {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .toolbar-right {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .bar-ok,
+  .bar-err,
+  .bar-fill {
+    fill: CanvasText;
+    background: CanvasText;
+  }
+}

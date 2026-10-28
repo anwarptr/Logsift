@@ -9,9 +9,14 @@ import { MalformedList } from './components/MalformedList';
 import { RowDetailPanel } from './components/RowDetailPanel';
 import { SearchBox } from './components/SearchBox';
 import { TableToolbar } from './components/TableToolbar';
+import { ThemeToggle } from './components/ThemeToggle';
 import { useUrlSync } from './filters/useUrlSync';
 import { useLogStore } from './store/logStore';
 import { useDisplayIndices, useSearchHighlight, useVisibleColumns } from './store/useView';
+import { useShortcuts } from './utils/useShortcuts';
+
+const NARROW = '(max-width: 900px)';
+const isNarrow = () => typeof window !== 'undefined' && window.matchMedia?.(NARROW).matches;
 
 export default function App() {
   const status = useLogStore((s) => s.status);
@@ -24,11 +29,12 @@ export default function App() {
   const columns = useVisibleColumns();
   const indices = useDisplayIndices();
   const highlight = useSearchHighlight();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isNarrow());
   const insightsOpen = useLogStore((s) => s.insightsOpen);
   const setInsightsOpen = useLogStore((s) => s.setInsightsOpen);
 
   useUrlSync();
+  useShortcuts();
 
   return (
     <div className="app">
@@ -47,6 +53,7 @@ export default function App() {
             </button>
           )}
           {hasData && <DropZone compact />}
+          <ThemeToggle />
         </div>
       </header>
       {error && (
@@ -64,6 +71,14 @@ export default function App() {
           <div className="workspace">
             {sidebarOpen && (
               <div id="filter-sidebar" className="sidebar-wrap">
+                <button
+                  type="button"
+                  className="btn small ghost sidebar-close"
+                  aria-label="Close filters"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  ✕
+                </button>
                 <FilterSidebar />
               </div>
             )}

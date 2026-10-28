@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:perf": "vitest run --config vitest.perf.config.ts"
+    "test:perf": "vitest run --config vitest.perf.config.ts",
+    "gen:iis": "node scripts/gen-iis.ts"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.23",
@@ -18,10 +19,13 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^25.0.1",
     "typescript": "5.7",
     "vite": "^6.4.5",
     "vitest": "^3.2.7"
