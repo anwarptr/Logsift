@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { EMPTY_FILTERS, type FilterState } from '../filters/types';
+import { hasActiveFilters, parseFilters } from '../filters/urlState';
 import type { ColumnDef, LogFormat, LogRow, MalformedRow } from '../parser';
 import { startParse } from '../worker/client';
 import type { WorkerResponse } from '../worker/protocol';
@@ -46,7 +48,15 @@ export interface LogState {
   theme: ThemePref;
   slowThresholdMs: number;
 
+  // --- filters ---
+  filters: FilterState;
+  /** True when filters came from the URL and should survive the first file load. */
+  keepFiltersOnLoad: boolean;
+
   loadFile(file: File): void;
+  setFilters(patch: Partial<FilterState>): void;
+  replaceFilters(f: FilterState): void;
+  clearFilters(): void;
   setFormatOverride(format: LogFormat | 'auto'): void;
   setError(message: string | null): void;
 
@@ -85,6 +95,7 @@ export function defaultColumnWidth(col: ColumnDef): number {
 export const MIN_COLUMN_WIDTH = 44;
 
 const prefs = loadPrefs();
+const initialFilters = typeof location === 'undefined' ? EMPTY_FILTERS : parseFilters(location.hash);
 
 export const useLogStore = create<LogState>()((set, get) => {
   /** Merge a (possibly grown) schema into the column order without disturbing user choices. */
@@ -102,8 +113,10 @@ export const useLogStore = create<LogState>()((set, get) => {
     return { columnOrder: [...s.columnOrder, ...added.map((c) => c.key)], hiddenColumns: hidden, columnWidths: widths };
   }
 
-  function parse(source: Blob, file: FileMeta, override: LogFormat | 'auto') {
+  function parse(source: Blob, file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean) {
+    if (resetFilters && !get().keepFiltersOnLoad) set({ filters: EMPTY_FILTERS });
     set({
+      keepFiltersOnLoad: false,
       status: 'loading',
       error: null,
       file,
@@ -184,6 +197,21 @@ export const useLogStore = create<LogState>()((set, get) => {
     theme: prefs.theme,
     slowThresholdMs: prefs.slowThresholdMs,
 
+    filters: initialFilters,
+    keepFiltersOnLoad: hasActiveFilters(initialFilters),
+
+    setFilters(patch) {
+      set((s) => ({ filters: { ...s.filters, ...patch } }));
+    },
+
+    replaceFilters(filters) {
+      set({ filters });
+    },
+
+    clearFilters() {
+      set({ filters: EMPTY_FILTERS });
+    },
+
     loadFile(file) {
       if (!isAcceptedFile(file.name)) {
         set({ error: `"${file.name}" is not supported. Choose a .log or .txt file.` });
@@ -193,12 +221,12 @@ export const useLogStore = create<LogState>()((set, get) => {
         set({ error: `"${file.name}" is empty.` });
         return;
       }
-      parse(file, { name: file.name, size: file.size }, get().formatOverride);
+      parse(file, { name: file.name, size: file.size }, get().formatOverride, true);
     },
 
     setFormatOverride(format) {
       const { source, file } = get();
-      if (source && file) parse(source, file, format);
+      if (source && file) parse(source, file, format, false);
       else set({ formatOverride: format });
     },
 
