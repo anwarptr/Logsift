@@ -2,15 +2,24 @@ import { create } from 'zustand';
 import type { ColumnDef, LogFormat, LogRow, MalformedRow } from '../parser';
 import { startParse } from '../worker/client';
 import type { WorkerResponse } from '../worker/protocol';
+import { loadPrefs, savePrefs, type Density, type ThemePref } from './prefs';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type SortDir = 'asc' | 'desc';
+export type ViewTab = 'rows' | 'malformed';
 
 export interface FileMeta {
   name: string;
   size: number;
 }
 
+export interface SortState {
+  key: string;
+  dir: SortDir;
+}
+
 export interface LogState {
+  // --- data ---
   status: LoadStatus;
   error: string | null;
   file: FileMeta | null;
@@ -21,15 +30,36 @@ export interface LogState {
   formatOverride: LogFormat | 'auto';
   progress: { bytesRead: number; totalBytes: number; lines: number };
   parseMs: number | null;
-
   rows: LogRow[];
   malformed: MalformedRow[];
   meta: string[];
   schema: ColumnDef[];
 
+  // --- view ---
+  columnOrder: string[];
+  hiddenColumns: Record<string, true>;
+  columnWidths: Record<string, number>;
+  sort: SortState | null;
+  selectedId: number | null;
+  tab: ViewTab;
+  density: Density;
+  theme: ThemePref;
+  slowThresholdMs: number;
+
   loadFile(file: File): void;
   setFormatOverride(format: LogFormat | 'auto'): void;
-  setError(message: string): void;
+  setError(message: string | null): void;
+
+  setColumnVisible(key: string, visible: boolean): void;
+  moveColumn(key: string, toIndex: number): void;
+  setColumnWidth(key: string, width: number): void;
+  resetColumns(): void;
+  toggleSort(key: string): void;
+  select(id: number | null): void;
+  setTab(tab: ViewTab): void;
+  setDensity(d: Density): void;
+  setTheme(t: ThemePref): void;
+  setSlowThreshold(ms: number): void;
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt'];
@@ -39,7 +69,39 @@ export function isAcceptedFile(name: string): boolean {
   return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
+/** Noisy columns that start hidden (they can be shown from the column chooser). */
+const DEFAULT_HIDDEN = new Set(['cs(Cookie)', 'sc-substatus', 'sc-win32-status', 'timestamp_raw']);
+
+export function defaultColumnWidth(col: ColumnDef): number {
+  if (col.type === 'timestamp') return 168;
+  if (col.role === 'message') return 520;
+  if (col.role === 'uri' || col.role === 'userAgent' || col.key === 'arrLogId') return 240;
+  if (col.role === 'status' || col.role === 'method' || col.role === 'level') return 76;
+  if (col.type === 'number') return 92;
+  if (col.type === 'boolean') return 96;
+  return 150;
+}
+
+export const MIN_COLUMN_WIDTH = 44;
+
+const prefs = loadPrefs();
+
 export const useLogStore = create<LogState>()((set, get) => {
+  /** Merge a (possibly grown) schema into the column order without disturbing user choices. */
+  function syncColumns(schema: ColumnDef[]) {
+    const s = get();
+    const known = new Set(s.columnOrder);
+    const added = schema.filter((c) => !known.has(c.key));
+    if (added.length === 0) return {};
+    const hidden = { ...s.hiddenColumns };
+    const widths = { ...s.columnWidths };
+    for (const c of added) {
+      if (DEFAULT_HIDDEN.has(c.key)) hidden[c.key] = true;
+      widths[c.key] ??= defaultColumnWidth(c);
+    }
+    return { columnOrder: [...s.columnOrder, ...added.map((c) => c.key)], hiddenColumns: hidden, columnWidths: widths };
+  }
+
   function parse(source: Blob, file: FileMeta, override: LogFormat | 'auto') {
     set({
       status: 'loading',
@@ -55,6 +117,12 @@ export const useLogStore = create<LogState>()((set, get) => {
       malformed: [],
       meta: [],
       schema: [],
+      columnOrder: [],
+      hiddenColumns: {},
+      columnWidths: {},
+      sort: null,
+      selectedId: null,
+      tab: 'rows',
     });
     startParse(source, override === 'auto' ? undefined : override, (msg: WorkerResponse) => {
       switch (msg.type) {
@@ -68,6 +136,7 @@ export const useLogStore = create<LogState>()((set, get) => {
             malformed: msg.malformed.length ? s.malformed.concat(msg.malformed) : s.malformed,
             meta: msg.meta.length ? s.meta.concat(msg.meta) : s.meta,
             schema: msg.schema,
+            ...syncColumns(msg.schema),
           });
           break;
         }
@@ -75,7 +144,13 @@ export const useLogStore = create<LogState>()((set, get) => {
           set({ progress: { bytesRead: msg.bytesRead, totalBytes: msg.totalBytes, lines: msg.lines } });
           break;
         case 'done':
-          set((s) => ({ status: 'ready', parseMs: msg.elapsedMs, progress: { ...s.progress, lines: msg.lines } }));
+          set((s) => ({
+            status: 'ready',
+            parseMs: msg.elapsedMs,
+            progress: { ...s.progress, lines: msg.lines },
+            // A file with only malformed lines is still useful: open that tab.
+            tab: s.rows.length === 0 && s.malformed.length > 0 ? 'malformed' : s.tab,
+          }));
           break;
         case 'error':
           set({ status: 'error', error: msg.message });
@@ -99,13 +174,23 @@ export const useLogStore = create<LogState>()((set, get) => {
     meta: [],
     schema: [],
 
+    columnOrder: [],
+    hiddenColumns: {},
+    columnWidths: {},
+    sort: null,
+    selectedId: null,
+    tab: 'rows',
+    density: prefs.density,
+    theme: prefs.theme,
+    slowThresholdMs: prefs.slowThresholdMs,
+
     loadFile(file) {
       if (!isAcceptedFile(file.name)) {
-        set({ status: 'error', error: `"${file.name}" is not supported. Choose a .log or .txt file.` });
+        set({ error: `"${file.name}" is not supported. Choose a .log or .txt file.` });
         return;
       }
       if (file.size === 0) {
-        set({ status: 'error', error: `"${file.name}" is empty.`, file: { name: file.name, size: 0 } });
+        set({ error: `"${file.name}" is empty.` });
         return;
       }
       parse(file, { name: file.name, size: file.size }, get().formatOverride);
@@ -118,7 +203,67 @@ export const useLogStore = create<LogState>()((set, get) => {
     },
 
     setError(message) {
-      set({ status: 'error', error: message });
+      set({ error: message });
+    },
+
+    setColumnVisible(key, visible) {
+      set((s) => {
+        const hidden = { ...s.hiddenColumns };
+        if (visible) delete hidden[key];
+        else hidden[key] = true;
+        return { hiddenColumns: hidden };
+      });
+    },
+
+    moveColumn(key, toIndex) {
+      set((s) => {
+        const order = s.columnOrder.filter((k) => k !== key);
+        const i = Math.max(0, Math.min(order.length, toIndex));
+        order.splice(i, 0, key);
+        return { columnOrder: order };
+      });
+    },
+
+    setColumnWidth(key, width) {
+      set((s) => ({ columnWidths: { ...s.columnWidths, [key]: Math.max(MIN_COLUMN_WIDTH, Math.round(width)) } }));
+    },
+
+    resetColumns() {
+      const schema = get().schema;
+      set({ columnOrder: [], hiddenColumns: {}, columnWidths: {} });
+      set(syncColumns(schema));
+    },
+
+    toggleSort(key) {
+      set((s) => {
+        if (!s.sort || s.sort.key !== key) return { sort: { key, dir: 'asc' } };
+        if (s.sort.dir === 'asc') return { sort: { key, dir: 'desc' } };
+        return { sort: null };
+      });
+    },
+
+    select(id) {
+      set({ selectedId: id });
+    },
+
+    setTab(tab) {
+      set({ tab });
+    },
+
+    setDensity(density) {
+      set({ density });
+      savePrefs({ density });
+    },
+
+    setTheme(theme) {
+      set({ theme });
+      savePrefs({ theme });
+    },
+
+    setSlowThreshold(ms) {
+      const v = Number.isFinite(ms) && ms >= 0 ? ms : 1000;
+      set({ slowThresholdMs: v });
+      savePrefs({ slowThresholdMs: v });
     },
   };
 });
