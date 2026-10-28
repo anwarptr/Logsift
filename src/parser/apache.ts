@@ -1,4 +1,5 @@
 import { SchemaBuilder, TIMESTAMP_COLUMN } from './schema';
+import { OffsetTracker } from './timezone';
 import type { CellValue, ColumnDef, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
 
 /**
@@ -16,13 +17,16 @@ const MONTHS: Record<string, number> = {
 export function parseApacheTimestamp(s: string): number | null {
   const month = MONTHS[s.slice(3, 6)];
   if (month === undefined || s.length < 20) return null;
-  let v = Date.UTC(+s.slice(7, 11), month, +s.slice(0, 2), +s.slice(12, 14), +s.slice(15, 17), +s.slice(18, 20));
-  if (s.length >= 26) {
-    const sign = s[21] === '-' ? -1 : 1;
-    const offsetMin = +s.slice(22, 24) * 60 + +s.slice(24, 26);
-    v -= sign * offsetMin * 60_000;
-  }
-  return Number.isNaN(v) ? null : v;
+  const v = Date.UTC(+s.slice(7, 11), month, +s.slice(0, 2), +s.slice(12, 14), +s.slice(15, 17), +s.slice(18, 20));
+  const t = v - (apacheOffset(s) ?? 0) * 60_000;
+  return Number.isNaN(t) ? null : t;
+}
+
+/** Offset of "10/Oct/2000:13:55:36 -0700" in minutes east of UTC, or null without one. */
+export function apacheOffset(s: string): number | null {
+  if (s.length < 26) return null;
+  const min = +s.slice(22, 24) * 60 + +s.slice(24, 26);
+  return Number.isNaN(min) ? null : s[21] === '-' ? -min : min;
 }
 
 const COLUMNS: ColumnDef[] = [
@@ -48,6 +52,7 @@ export function createApacheParser(): LineParser {
   let malformed: MalformedRow[] = [];
   let rowId = 0;
   let malformedId = 0;
+  const zones = new OffsetTracker();
 
   function pushLine(line: string, lineNo: number): void {
     if (line.trim().length === 0) return;
@@ -57,6 +62,7 @@ export function createApacheParser(): LineParser {
       return;
     }
     const ts = parseApacheTimestamp(m[4]!);
+    zones.observe(apacheOffset(m[4]!));
     const request = m[5]!;
     const reqParts = request.split(' ');
     let method: string | null = null;
@@ -100,5 +106,5 @@ export function createApacheParser(): LineParser {
     return out;
   }
 
-  return { format: 'apache', pushLine, drain, finish: drain, schema: () => schema.list() };
+  return { format: 'apache', pushLine, drain, finish: drain, schema: () => schema.list(), timeZone: () => zones.result() };
 }

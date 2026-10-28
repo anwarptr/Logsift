@@ -1,3 +1,7 @@
+import type { LogTimeZone } from './timezone';
+
+export type { LogTimeZone } from './timezone';
+
 export type LogFormat = 'iis' | 'apache' | 'jsonl' | 'generic';
 
 export const FORMAT_LABELS: Record<LogFormat, string> = {
@@ -79,6 +83,8 @@ export interface LineParser {
   finish(): ParsedChunk;
   /** Current schema: union of every column seen so far, in first-seen order. */
   schema(): ColumnDef[];
+  /** Time zone the timestamps were written in, as far as the lines seen so far tell. */
+  timeZone(): LogTimeZone;
 }
 
 export interface ParseResult {
@@ -87,4 +93,5 @@ export interface ParseResult {
   malformed: MalformedRow[];
   meta: string[];
   schema: ColumnDef[];
+  timeZone: LogTimeZone;
 }

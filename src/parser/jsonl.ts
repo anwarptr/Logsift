@@ -1,4 +1,5 @@
 import { SchemaBuilder, TIMESTAMP_COLUMN } from './schema';
+import { OffsetTracker, parseZoneSuffix } from './timezone';
 import type { CellValue, ColumnRole, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
 
 const TIMESTAMP_KEYS = ['timestamp', '@timestamp', 'time', 'ts', 'date', 'datetime', 'Timestamp', 'Time'];
@@ -35,7 +36,8 @@ export function toEpochMs(v: unknown): number | null {
     return v < 1e11 ? Math.round(v * 1000) : Math.round(v);
   }
   if (typeof v === 'string') {
-    const t = Date.parse(v);
+    // Zone-less date-times are UTC, as in the generic parser (Date.parse would use local time).
+    const t = Date.parse(parseZoneSuffix(v) === null && /\d:\d{2}/.test(v) ? v.trim() + 'Z' : v);
     return Number.isNaN(t) ? null : t;
   }
   return null;
@@ -47,6 +49,7 @@ export function createJsonlParser(): LineParser {
   let malformed: MalformedRow[] = [];
   let rowId = 0;
   let malformedId = 0;
+  const zones = new OffsetTracker();
 
   function bad(line: string, lineNo: number, reason: string): void {
     malformed.push({ id: malformedId++, lineNo, raw: line, reason });
@@ -74,7 +77,9 @@ export function createJsonlParser(): LineParser {
     const values: Record<string, CellValue> = {};
     let ts: number | null = null;
     if (tsKey !== undefined) {
-      ts = toEpochMs(rec[tsKey]);
+      const rawTs = rec[tsKey];
+      ts = toEpochMs(rawTs);
+      if (typeof rawTs === 'string' && ts !== null) zones.observe(parseZoneSuffix(rawTs));
       schema.add(TIMESTAMP_COLUMN);
       values.timestamp = ts;
     }
@@ -100,5 +105,5 @@ export function createJsonlParser(): LineParser {
     return out;
   }
 
-  return { format: 'jsonl', pushLine, drain, finish: drain, schema: () => schema.list() };
+  return { format: 'jsonl', pushLine, drain, finish: drain, schema: () => schema.list(), timeZone: () => zones.result() };
 }

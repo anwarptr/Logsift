@@ -2,6 +2,7 @@ import { topN, type FacetEntry } from '../filters/facets';
 import { FLAG_ERROR_LEVEL, type LogIndex } from '../filters/logIndex';
 import type { ColumnDef, LogRow } from '../parser';
 import { autoBucketSize, histogram, summarize, type Histogram, type NumberSummary } from './stats';
+import { alignOffsetMs, UTC_ZONE, type DisplayZone } from './timezone';
 
 export interface Insights {
   total: number;
@@ -37,6 +38,7 @@ export function computeInsights(
   index: LogIndex,
   matched: Uint32Array,
   targetBuckets = 60,
+  zone: DisplayZone = UTC_ZONE,
 ): Insights {
   const n = matched.length;
   const byRole = (r: ColumnDef['role']) => schema.find((c) => c.role === r)?.key;
@@ -95,7 +97,7 @@ export function computeInsights(
   }
   if (min <= max) {
     const bucketMs = autoBucketSize(max - min, targetBuckets);
-    const h = histogram(ts, min, max, bucketMs);
+    const h = histogram(ts, min, max, bucketMs, alignOffsetMs(zone, min));
     const errs = new Uint32Array(h.counts.length);
     for (let i = 0; i < n; i++) {
       if (!isError[i]) continue;

@@ -47,8 +47,9 @@ export interface Histogram {
  * Count values into fixed-size buckets aligned to multiples of bucketMs.
  * Values outside [min, max] and NaN are ignored.
  */
-export function histogram(values: ArrayLike<number>, min: number, max: number, bucketMs: number): Histogram {
-  const start = Math.floor(min / bucketMs) * bucketMs;
+/** `alignMs` shifts bucket boundaries so they fall on wall-clock multiples in a zone (its offset in ms). */
+export function histogram(values: ArrayLike<number>, min: number, max: number, bucketMs: number, alignMs = 0): Histogram {
+  const start = Math.floor((min + alignMs) / bucketMs) * bucketMs - alignMs;
   const n = Math.max(1, Math.floor((max - start) / bucketMs) + 1);
   const counts = new Uint32Array(n);
   for (let i = 0; i < values.length; i++) {

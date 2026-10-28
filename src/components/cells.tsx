@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { CellValue, ColumnDef } from '../parser';
 import { formatTimestamp } from '../utils/format';
+import { UTC_ZONE, type DisplayZone } from '../utils/timezone';
 
 export function statusClass(v: CellValue): string {
   if (typeof v !== 'number') return '';
@@ -35,9 +36,9 @@ export function levelClass(v: CellValue): string {
 }
 
 /** Plain-text representation of a cell, used for display, search and export. */
-export function cellText(col: ColumnDef, v: CellValue): string {
+export function cellText(col: ColumnDef, v: CellValue, zone: DisplayZone = UTC_ZONE): string {
   if (v === null || v === undefined) return '';
-  if (col.type === 'timestamp' && typeof v === 'number') return formatTimestamp(v);
+  if (col.type === 'timestamp' && typeof v === 'number') return formatTimestamp(v, zone);
   return String(v);
 }
 
@@ -63,10 +64,10 @@ export function highlight(text: string, re: RegExp | null): ReactNode {
   return out;
 }
 
-export function renderCell(col: ColumnDef, v: CellValue, re: RegExp | null): ReactNode {
+export function renderCell(col: ColumnDef, v: CellValue, re: RegExp | null, zone: DisplayZone = UTC_ZONE): ReactNode {
   if (v === null || v === undefined) return <span className="null">-</span>;
   if (col.type === 'boolean') return v ? <span className="bool-true">yes</span> : <span className="muted">no</span>;
-  const text = cellText(col, v);
+  const text = cellText(col, v, zone);
   if (col.role === 'status') return <span className={`pill ${statusClass(v)}`}>{highlight(text, re)}</span>;
   if (col.role === 'level') return <span className={`pill ${levelClass(v)}`}>{highlight(text, re)}</span>;
   if (col.role === 'message') return highlight(text.split('\n', 1)[0] ?? '', re);

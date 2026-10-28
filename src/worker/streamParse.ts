@@ -1,5 +1,5 @@
 import { createParser, detectFormat } from '../parser';
-import type { ColumnDef, LineParser, LogFormat, LogRow, MalformedRow } from '../parser';
+import type { ColumnDef, LineParser, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
 
 export const CHUNK_BYTES = 4 * 1024 * 1024;
 export const BATCH_ROWS = 20_000;
@@ -29,6 +29,7 @@ export interface StreamParseSummary {
   lines: number;
   rows: number;
   malformed: number;
+  timeZone: LogTimeZone;
 }
 
 export class ParseError extends Error {}
@@ -125,5 +126,5 @@ export async function streamParse(blob: Blob, opts: StreamParseOptions): Promise
   emit(true);
   if (!parser) throw new ParseError('The file is empty.');
   if (totalRows === 0 && totalMalformed === 0) throw new ParseError('No log entries were found in this file.');
-  return { format, detected, schema: parser.schema(), lines: lineNo, rows: totalRows, malformed: totalMalformed };
+  return { format, detected, schema: parser.schema(), lines: lineNo, rows: totalRows, malformed: totalMalformed, timeZone: parser.timeZone() };
 }

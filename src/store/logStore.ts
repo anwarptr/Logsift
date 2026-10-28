@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { EMPTY_FILTERS, type FilterState } from '../filters/types';
 import { hasActiveFilters, parseFilters } from '../filters/urlState';
-import type { ColumnDef, LogFormat, LogRow, MalformedRow } from '../parser';
+import type { ColumnDef, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
 import { startParse } from '../worker/client';
 import type { WorkerResponse } from '../worker/protocol';
-import { loadPrefs, savePrefs, type Density, type ThemePref } from './prefs';
+import { loadPrefs, savePrefs, type Density, type ThemePref, type TimeDisplay } from './prefs';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type SortDir = 'asc' | 'desc';
@@ -36,6 +36,8 @@ export interface LogState {
   malformed: MalformedRow[];
   meta: string[];
   schema: ColumnDef[];
+  /** Detected once parsing finishes. */
+  logTimeZone: LogTimeZone | null;
 
   // --- view ---
   columnOrder: string[];
@@ -48,6 +50,7 @@ export interface LogState {
   theme: ThemePref;
   slowThresholdMs: number;
   insightsOpen: boolean;
+  timeDisplay: TimeDisplay;
 
   // --- filters ---
   filters: FilterState;
@@ -74,6 +77,7 @@ export interface LogState {
   setTheme(t: ThemePref): void;
   setSlowThreshold(ms: number): void;
   setInsightsOpen(open: boolean): void;
+  setTimeDisplay(d: TimeDisplay): void;
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt'];
@@ -137,6 +141,7 @@ export const useLogStore = create<LogState>()((set, get) => {
       malformed: [],
       meta: [],
       schema: [],
+      logTimeZone: null,
       columnOrder: [],
       hiddenColumns: {},
       columnWidths: {},
@@ -167,6 +172,7 @@ export const useLogStore = create<LogState>()((set, get) => {
           set((s) => ({
             status: 'ready',
             parseMs: msg.elapsedMs,
+            logTimeZone: msg.timeZone,
             progress: { ...s.progress, lines: msg.lines },
             // A file with only malformed lines is still useful: open that tab.
             tab: s.rows.length === 0 && s.malformed.length > 0 ? 'malformed' : s.tab,
@@ -193,6 +199,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     malformed: [],
     meta: [],
     schema: [],
+    logTimeZone: null,
 
     columnOrder: [],
     hiddenColumns: {},
@@ -204,6 +211,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     theme: prefs.theme,
     slowThresholdMs: prefs.slowThresholdMs,
     insightsOpen: prefs.insightsOpen,
+    timeDisplay: prefs.timeDisplay,
 
     filters: initialFilters,
     keepFiltersOnLoad: hasActiveFilters(initialFilters),
@@ -308,6 +316,11 @@ export const useLogStore = create<LogState>()((set, get) => {
     setInsightsOpen(insightsOpen) {
       set({ insightsOpen });
       savePrefs({ insightsOpen });
+    },
+
+    setTimeDisplay(timeDisplay) {
+      set({ timeDisplay });
+      savePrefs({ timeDisplay });
     },
 
     setSlowThreshold(ms) {

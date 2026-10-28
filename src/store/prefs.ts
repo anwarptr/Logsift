@@ -1,15 +1,18 @@
 export type Density = 'compact' | 'comfortable';
 export type ThemePref = 'system' | 'light' | 'dark';
+/** Show timestamps in the log's own zone or the browser's local zone. */
+export type TimeDisplay = 'log' | 'local';
 
 export interface Prefs {
   density: Density;
   theme: ThemePref;
   slowThresholdMs: number;
   insightsOpen: boolean;
+  timeDisplay: TimeDisplay;
 }
 
 const KEY = 'log-viewer:prefs';
-const DEFAULTS: Prefs = { density: 'compact', theme: 'system', slowThresholdMs: 1000, insightsOpen: true };
+const DEFAULTS: Prefs = { density: 'compact', theme: 'system', slowThresholdMs: 1000, insightsOpen: true, timeDisplay: 'log' };
 
 /** Per-browser UI preferences. Storage may be unavailable (private mode), so every access is guarded. */
 export function loadPrefs(): Prefs {
@@ -23,6 +26,7 @@ export function loadPrefs(): Prefs {
       slowThresholdMs:
         typeof p.slowThresholdMs === 'number' && p.slowThresholdMs >= 0 ? p.slowThresholdMs : DEFAULTS.slowThresholdMs,
       insightsOpen: p.insightsOpen !== false,
+      timeDisplay: p.timeDisplay === 'local' ? 'local' : 'log',
     };
   } catch {
     return { ...DEFAULTS };

@@ -2,6 +2,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { memo, useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { ColumnDef, LogRow } from '../parser';
 import { useLogStore } from '../store/logStore';
+import { useDisplayZone } from '../store/useView';
+import type { DisplayZone } from '../utils/timezone';
 import { renderCell } from './cells';
 
 export const ROW_HEIGHT = { compact: 24, comfortable: 34 } as const;
@@ -19,6 +21,7 @@ interface RowProps {
   columns: ColumnDef[];
   widths: Record<string, number>;
   highlight: RegExp | null;
+  zone: DisplayZone;
   selected: boolean;
   active: boolean;
   slow: boolean;
@@ -43,7 +46,7 @@ const Row = memo(function Row(p: RowProps) {
     >
       {p.columns.map((c) => (
         <div key={c.key} role="gridcell" className={`td t-${c.type}`} style={{ width: p.widths[c.key] }}>
-          {renderCell(c, p.row.values[c.key] ?? null, p.highlight)}
+          {renderCell(c, p.row.values[c.key] ?? null, p.highlight, p.zone)}
         </div>
       ))}
     </div>
@@ -61,6 +64,7 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
   const slowMs = useLogStore((s) => s.slowThresholdMs);
   const schema = useLogStore((s) => s.schema);
   const durationKey = schema.find((c) => c.role === 'duration')?.key;
+  const zone = useDisplayZone();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState(0);
@@ -225,6 +229,7 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
               columns={columns}
               widths={widths}
               highlight={highlight}
+              zone={zone}
               selected={row.id === selectedId}
               active={vi.index === cursor}
               slow={typeof dur === 'number' && dur > slowMs}

@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import { compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
 import { buildLogIndex, type LogIndex } from '../filters/logIndex';
 import type { FilterState } from '../filters/types';
-import type { ColumnDef, LogRow } from '../parser';
+import type { ColumnDef, LogRow, LogTimeZone } from '../parser';
 import { computeInsights, type Insights } from '../utils/insights';
 import { sortIndices } from '../utils/sort';
+import { logDisplayZone, type DisplayZone } from '../utils/timezone';
 import { useLogStore } from './logStore';
+import type { TimeDisplay } from './prefs';
 
 /**
  * Derived data is shared by the table, sidebar and insights panel, so it is
@@ -69,8 +71,9 @@ export function useDisplayIndices(): Uint32Array {
   return getSorted(rows, matched, col, sort?.dir);
 }
 
-const getInsights = memoLast((rows: LogRow[], schema: ColumnDef[], index: LogIndex, matched: Uint32Array) =>
-  computeInsights(rows, schema, index, matched),
+const getInsights = memoLast(
+  (rows: LogRow[], schema: ColumnDef[], index: LogIndex, matched: Uint32Array, zone: DisplayZone) =>
+    computeInsights(rows, schema, index, matched, undefined, zone),
 );
 
 /** Insights over the filtered rows; null while loading. */
@@ -79,7 +82,8 @@ export function useInsights(): Insights | null {
   const schema = useLogStore((s) => s.schema);
   const index = useLogIndex();
   const ev = useFilterEval();
-  return index && ev ? getInsights(rows, schema, index, ev.matched) : null;
+  const zone = useDisplayZone();
+  return index && ev ? getInsights(rows, schema, index, ev.matched, zone) : null;
 }
 
 export function useSearchHighlight(): RegExp | null {
@@ -97,4 +101,17 @@ export function useVisibleColumns(): ColumnDef[] {
     const byKey = new Map(schema.map((c) => [c.key, c]));
     return order.filter((k) => !hidden[k]).map((k) => byKey.get(k)).filter((c): c is ColumnDef => c !== undefined);
   }, [schema, order, hidden]);
+}
+
+const LOCAL_ZONE: DisplayZone = { kind: 'local' };
+// Module-level so every component gets the same object (it feeds the memoized insights).
+const getZone = memoLast((display: TimeDisplay, tz: LogTimeZone | null) =>
+  display === 'local' ? LOCAL_ZONE : logDisplayZone(tz),
+);
+
+/** Zone timestamps are shown in: the log's own zone, or local time when the user switched to it. */
+export function useDisplayZone(): DisplayZone {
+  const tz = useLogStore((s) => s.logTimeZone);
+  const display = useLogStore((s) => s.timeDisplay);
+  return getZone(display, tz);
 }

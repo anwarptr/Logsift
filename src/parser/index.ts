@@ -7,6 +7,7 @@ import type { LineParser, LogFormat, LogRow, MalformedRow, ParseResult } from '.
 
 export * from './types';
 export { detectFormat } from './detectFormat';
+export { IIS_TIME_ZONE, OffsetTracker, parseZoneSuffix } from './timezone';
 
 export function createParser(format: LogFormat): LineParser {
   switch (format) {
@@ -45,5 +46,5 @@ export function parseText(text: string, format?: LogFormat): ParseResult {
   for (const r of chunk.rows) rows.push(r);
   for (const m of chunk.malformed) malformed.push(m);
   for (const m of chunk.meta) meta.push(m);
-  return { format: fmt, rows, malformed, meta, schema: parser.schema() };
+  return { format: fmt, rows, malformed, meta, schema: parser.schema(), timeZone: parser.timeZone() };
 }

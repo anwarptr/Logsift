@@ -35,6 +35,21 @@ re-parses the file with a forced format.
 | **JSON lines** | ≥ 60% of lines are JSON objects | Columns are the union of keys; nested values are shown as JSON. `timestamp`/`@timestamp`/`time`/`ts`/`date` becomes the timestamp; `level`/`severity`, `message`/`msg`, `logger`/`source`, `status`, `path`/`url`, `durationMs` get semantic roles. |
 | **Generic text** | fallback | Regex extracts a leading ISO-like timestamp, a level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL and common aliases like `WRN`, `Information`), an optional `[logger]`, and the message. Lines without a timestamp (stack traces) are appended to the previous entry. |
 
+### Time zones
+
+The log's time zone is detected while parsing and shown in the file bar:
+
+| Format | Zone |
+| --- | --- |
+| IIS | Always UTC (W3C extended logs are written in UTC). |
+| Apache/Nginx | The offset in the timestamps (`[10/Oct/2000:13:55:36 -0700]` → UTC-07:00). |
+| JSON lines / generic text | A trailing `Z` or `±hh:mm` on the timestamps. Timestamps without a zone (and epoch numbers in JSON) are read as UTC and shown as "Not stated (assumed UTC)". |
+
+If timestamps use more than one offset the zone is "Mixed" and log time is shown in UTC. When the browser's local
+time differs from the log's zone, a **Log time / Local** switch appears next to it. It changes every displayed
+timestamp: table, row details, time-range inputs and chips, histogram axis/tooltip and bucket boundaries, slowest
+requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute instants). The choice is remembered.
+
 ### IIS / Azure App Service extras
 
 - `s-sitename` with the `~1` prefix (Azure SCM/Kudu site) is stripped, and a derived boolean **`isScm`** is added.
@@ -123,8 +138,14 @@ insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap af
 
 ## Design decisions
 
-- **UTC everywhere.** IIS logs are UTC, so timestamps are displayed and entered (time-range inputs) in UTC rather
-  than local time. Generic/JSON timestamps without a zone are treated as UTC.
+- **Log time by default.** Timestamps are displayed and entered (time-range inputs) in the log's own zone (UTC for
+  IIS), so they match the file. Local time is opt-in through the switch, which is shown only when the zones actually
+  differ: it compares offsets at the first and last timestamp, so a DST change inside the file counts. In local mode
+  every value uses the offset in effect at its own instant (DST-correct).
+- **Zone-less timestamps are UTC** (generic text and JSON lines). JSON strings like `2026-10-27T04:42:02` used
+  to be read as browser-local time by `Date.parse`; they are now read as UTC like the generic parser.
+- **Exports carry an explicit offset** in the current display zone (`2026-10-27T08:42:02.120+04:00`, or `…Z`
+  for UTC), so they are unambiguous whichever view was active.
 - **`date` + `time` are replaced** by a single `timestamp` column (the raw line still has the originals).
 - **IIS `+` encoding is kept** as stored (e.g. `Mozilla/5.0+(Windows…)`), so values match the file and search
   works on what you see in the raw line.
@@ -151,6 +172,9 @@ insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap af
 - **Preferences** (theme, density, slow threshold, insights open) live in `localStorage`; failures are ignored.
 
 ## Known limitations
+
+- Zone-less timestamps can't be reinterpreted as local time (they are always read as UTC); the Local view only
+  converts from that assumption. Mixed-offset logs are shown in UTC rather than in each line's own offset.
 
 - Rows are held in memory as objects; very large files (≫ 100 MB / several million lines) can exhaust the tab's
   memory. In the benchmark an 85 MB file used ≈ 450 MB of heap in Node; in the browser expect more, since the

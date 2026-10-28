@@ -25,7 +25,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       onBatch: (batch) => post({ type: 'batch', jobId, ...batch }),
       onProgress: (bytesRead, totalBytes, lines) => post({ type: 'progress', jobId, bytesRead, totalBytes, lines }),
     });
-    post({ type: 'done', jobId, lines: summary.lines, elapsedMs: performance.now() - started });
+    post({ type: 'done', jobId, lines: summary.lines, elapsedMs: performance.now() - started, timeZone: summary.timeZone });
   } catch (err) {
     if (err instanceof CancelledError) return;
     const message =

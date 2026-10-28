@@ -1,4 +1,5 @@
 import { TIMESTAMP_COLUMN } from './schema';
+import { OffsetTracker, parseZoneSuffix } from './timezone';
 import type { CellValue, ColumnDef, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
 
 /**
@@ -56,6 +57,7 @@ export function createGenericParser(): LineParser {
   let malformedId = 0;
   let sawLevel = false;
   let sawLogger = false;
+  const zones = new OffsetTracker();
 
   function pushLine(line: string, lineNo: number): void {
     if (line.trim().length === 0) return;
@@ -63,6 +65,7 @@ export function createGenericParser(): LineParser {
     if (m) {
       if (pending) rows.push(pending);
       const ts = parseLooseIso(m[1]!);
+      zones.observe(parseZoneSuffix(m[1]!));
       const level = m[2] ? normalizeLevel(m[2]) : null;
       const logger = m[3] ?? null;
       if (level) sawLevel = true;
@@ -103,5 +106,5 @@ export function createGenericParser(): LineParser {
     return cols;
   }
 
-  return { format: 'generic', pushLine, drain, finish, schema };
+  return { format: 'generic', pushLine, drain, finish, schema, timeZone: () => zones.result() };
 }

@@ -4,8 +4,9 @@ import { facetCounts, statusClassCounts, topUris } from '../filters/facets';
 import type { FacetColumn, LogIndex, RangeColumn } from '../filters/logIndex';
 import { STATUS_CLASSES, type Range, type StatusClass, type UriMode } from '../filters/types';
 import { useLogStore } from '../store/logStore';
-import { useFilterEval, useLogIndex } from '../store/useView';
+import { useDisplayZone, useFilterEval, useLogIndex } from '../store/useView';
 import { formatNumber, formatTimestamp } from '../utils/format';
+import { displayZoneLabel, fromZonedInput, toZonedInput } from '../utils/timezone';
 
 const FACET_PREVIEW = 8;
 
@@ -71,24 +72,20 @@ function QuickToggles({ index }: { index: LogIndex }) {
   );
 }
 
-const toInput = (ms: number) => new Date(ms).toISOString().slice(0, 19);
-const fromInput = (v: string): number | null => {
-  if (!v) return null;
-  const t = Date.parse(v.length === 16 ? `${v}:00Z` : `${v}Z`);
-  return Number.isNaN(t) ? null : t;
-};
-
 function TimeRange({ index }: { index: LogIndex }) {
   const from = useLogStore((s) => s.filters.timeFrom);
   const to = useLogStore((s) => s.filters.timeTo);
   const setFilters = useLogStore((s) => s.setFilters);
+  const zone = useDisplayZone();
   if (index.minTs === null || index.maxTs === null) return null;
   const min = index.minTs;
   const max = index.maxTs;
   const preset = (a: number | null, b: number | null) => setFilters({ timeFrom: a, timeTo: b });
   const FIVE_MIN = 5 * 60_000;
+  const toInput = (ms: number) => toZonedInput(ms, zone);
+  const fromInput = (v: string) => fromZonedInput(v, zone);
   return (
-    <Section title="Time range (UTC)">
+    <Section title={`Time range (${displayZoneLabel(zone, min)})`}>
       <div className="time-range">
         <label>
           <span>From</span>
@@ -132,7 +129,7 @@ function TimeRange({ index }: { index: LogIndex }) {
         </button>
       </div>
       <p className="muted small-text">
-        File spans {formatTimestamp(min)} – {formatTimestamp(max)}
+        File spans {formatTimestamp(min, zone)} – {formatTimestamp(max, zone)}
       </p>
     </Section>
   );

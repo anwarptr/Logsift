@@ -1,7 +1,8 @@
 import { EMPTY_FILTERS, facetLabel, type FilterState } from '../filters/types';
 import { useLogStore } from '../store/logStore';
-import { useMatchedIndices } from '../store/useView';
+import { useDisplayZone, useMatchedIndices } from '../store/useView';
 import { formatNumber, formatTimestamp } from '../utils/format';
+import { UTC_ZONE, type DisplayZone } from '../utils/timezone';
 
 interface Chip {
   id: string;
@@ -14,12 +15,12 @@ function summarize(values: string[], max = 3): string {
   return labels.length <= max ? labels.join(', ') : `${labels.slice(0, max).join(', ')} +${labels.length - max}`;
 }
 
-export function buildChips(f: FilterState, slowMs: number): Chip[] {
+export function buildChips(f: FilterState, slowMs: number, zone: DisplayZone = UTC_ZONE): Chip[] {
   const chips: Chip[] = [];
   if (f.search) chips.push({ id: 'search', label: `${f.regex ? 'Regex' : 'Search'}: ${f.search}`, remove: { search: '' } });
   if (f.timeFrom !== null || f.timeTo !== null) {
-    const a = f.timeFrom !== null ? formatTimestamp(f.timeFrom) : '…';
-    const b = f.timeTo !== null ? formatTimestamp(f.timeTo) : '…';
+    const a = f.timeFrom !== null ? formatTimestamp(f.timeFrom, zone) : '…';
+    const b = f.timeTo !== null ? formatTimestamp(f.timeTo, zone) : '…';
     chips.push({ id: 'time', label: `Time: ${a} → ${b}`, remove: { timeFrom: null, timeTo: null } });
   }
   if (f.statusClasses.length) {
@@ -61,7 +62,8 @@ export function FilterChips() {
   const slowMs = useLogStore((s) => s.slowThresholdMs);
   const total = useLogStore((s) => s.rows.length);
   const matched = useMatchedIndices().length;
-  const chips = buildChips(filters, slowMs);
+  const zone = useDisplayZone();
+  const chips = buildChips(filters, slowMs, zone);
 
   return (
     <div className="filter-chips" aria-label="Active filters">

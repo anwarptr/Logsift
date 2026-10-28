@@ -1,4 +1,5 @@
 import { SchemaBuilder, TIMESTAMP_COLUMN } from './schema';
+import { IIS_TIME_ZONE } from './timezone';
 import type { CellValue, ColumnDef, ColumnRole, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
 
 const NUMERIC_FIELDS = new Set([
@@ -181,5 +182,6 @@ export function createIisParser(): LineParser {
     drain,
     finish: drain,
     schema: () => schema.list(),
+    timeZone: () => IIS_TIME_ZONE,
   };
 }

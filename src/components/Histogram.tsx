@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import type { Insights } from '../utils/insights';
+import { useDisplayZone } from '../store/useView';
 import { formatDuration, formatNumber, formatTimestamp } from '../utils/format';
+import type { Insights } from '../utils/insights';
+import type { DisplayZone } from '../utils/timezone';
 
 type Timeline = NonNullable<Insights['timeline']>;
 
@@ -8,8 +10,8 @@ const HEIGHT = 132;
 const M = { top: 8, right: 8, bottom: 20, left: 40 };
 const GAP = 2;
 
-function axisLabel(ms: number, spanMs: number): string {
-  const s = formatTimestamp(ms);
+function axisLabel(ms: number, spanMs: number, zone: DisplayZone): string {
+  const s = formatTimestamp(ms, zone);
   return spanMs > 86_400_000 ? s.slice(5, 16) : s.slice(11, 19);
 }
 
@@ -28,6 +30,7 @@ export function Histogram({ data, onSelect }: { data: Timeline; onSelect(from: n
   const [width, setWidth] = useState(600);
   const [hover, setHover] = useState<number | null>(null);
   const [drag, setDrag] = useState<{ x0: number; x1: number } | null>(null);
+  const zone = useDisplayZone();
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -121,13 +124,13 @@ export function Histogram({ data, onSelect }: { data: Timeline; onSelect(from: n
           0
         </text>
         <text className="tick" x={M.left} y={HEIGHT - 4}>
-          {axisLabel(start, span)}
+          {axisLabel(start, span, zone)}
         </text>
         <text className="tick" x={M.left + innerW / 2} y={HEIGHT - 4} textAnchor="middle">
-          {axisLabel(start + span / 2, span)}
+          {axisLabel(start + span / 2, span, zone)}
         </text>
         <text className="tick" x={width - M.right} y={HEIGHT - 4} textAnchor="end">
-          {axisLabel(start + span, span)}
+          {axisLabel(start + span, span, zone)}
         </text>
         {drag && dragW > 0 && <rect className="drag-sel" x={dragX} y={M.top} width={dragW} height={innerH} />}
       </svg>
@@ -137,7 +140,7 @@ export function Histogram({ data, onSelect }: { data: Timeline; onSelect(from: n
           style={{ left: Math.min(width - 190, Math.max(0, M.left + (hovered.i + 0.5) * bw - 95)) }}
           role="status"
         >
-          <div className="mono">{formatTimestamp(start + hovered.i * bucketMs)}</div>
+          <div className="mono">{formatTimestamp(start + hovered.i * bucketMs, zone)}</div>
           <div>
             <strong>{formatNumber(hovered.total)}</strong> rows
             {hovered.err > 0 && <span className="err-text"> · {formatNumber(hovered.err)} errors</span>}

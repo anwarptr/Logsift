@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLogStore } from '../store/logStore';
-import { useDisplayIndices, useVisibleColumns } from '../store/useView';
+import { useDisplayIndices, useDisplayZone, useVisibleColumns } from '../store/useView';
 import { downloadParts } from '../utils/download';
 import { exportFileName, toCsvParts, toJsonParts } from '../utils/export';
 
@@ -11,6 +11,7 @@ export function ExportMenu() {
   const fileName = useLogStore((s) => s.file?.name);
   const indices = useDisplayIndices();
   const columns = useVisibleColumns();
+  const zone = useDisplayZone();
   const [busy, setBusy] = useState(false);
 
   function run(kind: 'csv' | 'json') {
@@ -18,8 +19,8 @@ export function ExportMenu() {
     // Let the button state paint before the (possibly large) synchronous export.
     setTimeout(() => {
       try {
-        if (kind === 'csv') downloadParts(toCsvParts(rows, indices, columns), exportFileName(fileName, 'csv'), 'text/csv');
-        else downloadParts(toJsonParts(rows, indices, schema), exportFileName(fileName, 'json'), 'application/json');
+        if (kind === 'csv') downloadParts(toCsvParts(rows, indices, columns, zone), exportFileName(fileName, 'csv'), 'text/csv');
+        else downloadParts(toJsonParts(rows, indices, schema, zone), exportFileName(fileName, 'json'), 'application/json');
       } finally {
         setBusy(false);
       }

@@ -1,15 +1,17 @@
 import type { ColumnDef, LogRow } from '../parser';
+import { formatIsoWithOffset } from './format';
+import { UTC_ZONE, type DisplayZone } from './timezone';
 
-function exportValue(col: ColumnDef, v: unknown): unknown {
+function exportValue(col: ColumnDef, v: unknown, zone: DisplayZone): unknown {
   if (v === undefined) return null;
-  return col.type === 'timestamp' && typeof v === 'number' ? new Date(v).toISOString() : v;
+  return col.type === 'timestamp' && typeof v === 'number' ? formatIsoWithOffset(v, zone) : v;
 }
 
-/** All fields of a row as a plain object (timestamps as ISO strings). */
-export function rowToJson(row: LogRow, schema: ColumnDef[]): Record<string, unknown> {
+/** All fields of a row as a plain object (timestamps as ISO strings with the offset of `zone`). */
+export function rowToJson(row: LogRow, schema: ColumnDef[], zone: DisplayZone = UTC_ZONE): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const c of schema) {
-    if (c.key in row.values) out[c.key] = exportValue(c, row.values[c.key]);
+    if (c.key in row.values) out[c.key] = exportValue(c, row.values[c.key], zone);
   }
   return out;
 }
@@ -22,21 +24,31 @@ export function csvEscape(v: unknown): string {
 }
 
 /** CSV of the given rows/columns, returned as string parts (cheap to turn into a Blob). */
-export function toCsvParts(rows: readonly LogRow[], indices: ArrayLike<number>, columns: ColumnDef[]): string[] {
+export function toCsvParts(
+  rows: readonly LogRow[],
+  indices: ArrayLike<number>,
+  columns: ColumnDef[],
+  zone: DisplayZone = UTC_ZONE,
+): string[] {
   const parts: string[] = [columns.map((c) => csvEscape(c.label)).join(',') + '\r\n'];
   for (let i = 0; i < indices.length; i++) {
     const row = rows[indices[i]!]!;
-    parts.push(columns.map((c) => csvEscape(exportValue(c, row.values[c.key]))).join(',') + '\r\n');
+    parts.push(columns.map((c) => csvEscape(exportValue(c, row.values[c.key], zone))).join(',') + '\r\n');
   }
   return parts;
 }
 
 /** JSON array of objects with every schema field plus the source line number. */
-export function toJsonParts(rows: readonly LogRow[], indices: ArrayLike<number>, schema: ColumnDef[]): string[] {
+export function toJsonParts(
+  rows: readonly LogRow[],
+  indices: ArrayLike<number>,
+  schema: ColumnDef[],
+  zone: DisplayZone = UTC_ZONE,
+): string[] {
   const parts: string[] = ['['];
   for (let i = 0; i < indices.length; i++) {
     const row = rows[indices[i]!]!;
-    parts.push((i ? ',\n' : '\n') + JSON.stringify({ lineNo: row.lineNo, ...rowToJson(row, schema) }));
+    parts.push((i ? ',\n' : '\n') + JSON.stringify({ lineNo: row.lineNo, ...rowToJson(row, schema, zone) }));
   }
   parts.push('\n]\n');
   return parts;

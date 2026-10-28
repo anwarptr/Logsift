@@ -1,3 +1,5 @@
+import { type DisplayZone, UTC_ZONE, formatOffset, wallClockIso, zoneOffsetAt } from './timezone';
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -14,12 +16,18 @@ export function formatNumber(n: number): string {
   return n.toLocaleString('en-US');
 }
 
-/** "2026-10-27 04:42:02.120" in UTC (log files are UTC; showing local time would be misleading). */
-export function formatTimestamp(ms: number | null): string {
+/** "2026-10-27 04:42:02.120" as wall-clock time in `zone` (UTC by default). */
+export function formatTimestamp(ms: number | null, zone: DisplayZone = UTC_ZONE): string {
   if (ms === null || !Number.isFinite(ms)) return '';
-  const iso = new Date(ms).toISOString();
+  const iso = wallClockIso(ms, zone);
   const frac = iso.slice(19, 23);
   return iso.slice(0, 10) + ' ' + iso.slice(11, 19) + (frac === '.000' ? '' : frac);
+}
+
+/** "2026-10-27T08:42:02.120+04:00" (or "…Z" for UTC): unambiguous, in `zone`'s wall-clock time. */
+export function formatIsoWithOffset(ms: number, zone: DisplayZone = UTC_ZONE): string {
+  const off = zoneOffsetAt(zone, ms);
+  return wallClockIso(ms, zone) + (off === 0 ? 'Z' : formatOffset(off).slice(3));
 }
 
 export function formatDuration(ms: number): string {

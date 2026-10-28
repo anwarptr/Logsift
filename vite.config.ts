@@ -10,5 +10,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.{ts,tsx}'],
     exclude: ['tests/perf/**', 'node_modules/**'],
+    // Fixed local zone so "local time" assertions are deterministic (UTC+4, no DST).
+    env: { TZ: 'Asia/Dubai' },
   },
 });

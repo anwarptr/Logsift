@@ -1,6 +1,6 @@
 import type { FacetEntry } from '../filters/facets';
 import { useLogStore } from '../store/logStore';
-import { useInsights } from '../store/useView';
+import { useDisplayZone, useInsights } from '../store/useView';
 import { formatBytes, formatNumber, formatTimestamp } from '../utils/format';
 import { levelClass, statusClass } from './cells';
 import { Histogram } from './Histogram';
@@ -71,6 +71,7 @@ export function InsightsPanel() {
   const setFilters = useLogStore((s) => s.setFilters);
   const select = useLogStore((s) => s.select);
   const setTab = useLogStore((s) => s.setTab);
+  const zone = useDisplayZone();
 
   if (!ins) return <div className="insights muted small-text">Insights are available once parsing finishes.</div>;
 
@@ -147,7 +148,7 @@ export function InsightsPanel() {
                     >
                       <span className="slow-ms">{formatNumber(s.duration)} ms</span>
                       <span className="bar-label mono">{uriKey ? String(row.values[uriKey] ?? '') : `line ${row.lineNo}`}</span>
-                      <span className="bar-count mono">{formatTimestamp(row.ts).slice(11)}</span>
+                      <span className="bar-count mono">{formatTimestamp(row.ts, zone).slice(11)}</span>
                     </button>
                   </li>
                 );

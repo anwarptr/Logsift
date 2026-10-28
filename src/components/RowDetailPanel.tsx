@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLogStore } from '../store/logStore';
+import { useDisplayZone } from '../store/useView';
 import { copyText } from '../utils/clipboard';
 import { rowToJson } from '../utils/export';
 import { cellText } from './cells';
@@ -9,6 +10,7 @@ export function RowDetailPanel() {
   const row = useLogStore((s) => (s.selectedId === null ? undefined : s.rows[s.selectedId]));
   const schema = useLogStore((s) => s.schema);
   const select = useLogStore((s) => s.select);
+  const zone = useDisplayZone();
   const [copied, setCopied] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -20,7 +22,7 @@ export function RowDetailPanel() {
 
   async function copy(kind: 'json' | 'raw') {
     if (!row) return;
-    const text = kind === 'json' ? JSON.stringify(rowToJson(row, schema), null, 2) : row.raw;
+    const text = kind === 'json' ? JSON.stringify(rowToJson(row, schema, zone), null, 2) : row.raw;
     const ok = await copyText(text);
     setCopied(ok ? (kind === 'json' ? 'Copied JSON' : 'Copied raw line') : 'Copy failed');
   }
@@ -61,7 +63,7 @@ export function RowDetailPanel() {
                 {c.derived && <span className="tag">derived</span>}
               </dt>
               <dd className={v === null ? 'null' : undefined}>
-                {v === null ? '-' : c.role === 'message' ? <pre>{cellText(c, v)}</pre> : cellText(c, v)}
+                {v === null ? '-' : c.role === 'message' ? <pre>{cellText(c, v, zone)}</pre> : cellText(c, v, zone)}
               </dd>
             </div>
           );

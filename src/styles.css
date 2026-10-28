@@ -413,6 +413,26 @@ input[type='checkbox'] {
   margin: 0;
   font-weight: 550;
 }
+.tz-info {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.tz-source {
+  font-size: 12px;
+  font-weight: 400;
+}
+.tz-switch {
+  display: inline-flex;
+  gap: 2px;
+  align-self: center;
+}
+.tz-switch .btn[aria-checked='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .file-name {
   max-width: 280px;
   overflow: hidden;

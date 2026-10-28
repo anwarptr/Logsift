@@ -19,7 +19,7 @@ vi.mock('../../src/worker/client', () => ({
       const res = parseText(text, format);
       onMessage({ type: 'start', jobId: 1, format: res.format, detected: res.format });
       onMessage({ type: 'batch', jobId: 1, rows: res.rows, malformed: res.malformed, meta: res.meta, schema: res.schema });
-      onMessage({ type: 'done', jobId: 1, lines: text.split('\n').length, elapsedMs: 1 });
+      onMessage({ type: 'done', jobId: 1, lines: text.split('\n').length, elapsedMs: 1, timeZone: res.timeZone });
     })();
   },
 }));
@@ -102,6 +102,28 @@ describe('App with the sample IIS log', () => {
     const insights = screen.getByLabelText('Insights for the filtered rows');
     expect(insights.textContent).toContain('Total requests3');
     expect(insights.textContent).toContain('Error rate0%');
+  });
+});
+
+describe('time zone', () => {
+  it('shows the detected zone and switches between log and local time', async () => {
+    await loadSample();
+    const info = screen.getByLabelText('File information');
+    expect(info.textContent).toContain('IIS logs are always UTC');
+    const sidebar = screen.getByLabelText('Filters');
+    expect(sidebar.textContent).toContain('Time range (UTC)');
+    expect(sidebar.textContent).toContain('File spans 2026-10-27 04:42:02 – 2026-10-27 04:43:32');
+
+    // Tests run in Asia/Dubai (UTC+4), which differs from the log's UTC.
+    const group = within(info).getByRole('radiogroup', { name: 'Show times in' });
+    const localBtn = within(group).getByRole('radio', { name: /Local \(UTC\+04:00/ });
+    fireEvent.click(localBtn);
+    expect(localBtn.getAttribute('aria-checked')).toBe('true');
+    expect(sidebar.textContent).toContain('Time range (local, UTC+04:00)');
+    expect(sidebar.textContent).toContain('File spans 2026-10-27 08:42:02 – 2026-10-27 08:43:32');
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Log time (UTC)' }));
+    expect(sidebar.textContent).toContain('File spans 2026-10-27 04:42:02');
   });
 });
 
