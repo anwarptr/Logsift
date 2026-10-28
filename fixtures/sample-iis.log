@@ -1,0 +1,18 @@
+#Software: Microsoft Internet Information Services 8.0
+#Fields: date time s-sitename cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Cookie) cs(Referer) cs-host sc-status sc-substatus sc-win32-status sc-bytes cs-bytes time-taken
+2026-10-27 04:42:02 DEMO-API-PROD GET / X-ARR-LOG-ID=bb3dad07-c9ba-4530-a480-3d5a3fb88889 443 - 10.20.0.11 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:42:04 DEMO-API-PROD GET / X-ARR-LOG-ID=213b4ac1-4113-49a3-a3d4-2c4f41769759 443 - 10.20.0.12 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:42:19 DEMO-API-PROD GET / X-ARR-LOG-ID=27d88907-342e-438e-a1e0-90b6882ea902 443 - 10.20.0.12 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:42:22 DEMO-API-PROD GET / X-ARR-LOG-ID=ffba9ef0-f193-4e72-af34-15e7d4a82c0a 443 - 127.0.0.1 AlwaysOn ARRAffinity=1d3ca434cc9bb7fd48f7ba391a828af94b8f215a966865f656ef07e5e9a9f763 - api.example.com 404 0 0 639 910 5
+2026-10-27 04:42:22 ~1DEMO-API-PROD GET / - 80 - 10.20.0.5 AlwaysOn - - api.example.com 200 0 0 3262 484 25
+2026-10-27 04:42:32 DEMO-API-PROD GET / X-ARR-LOG-ID=411e4614-c496-405b-a945-fcec132c8f9a 443 - 10.20.0.11 - - - api.example.com 404 0 0 639 796 3
+2026-10-27 04:42:34 DEMO-API-PROD GET / X-ARR-LOG-ID=b5cdd687-f60d-4f18-a260-104410b84f57 443 - 10.20.0.12 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:42:49 DEMO-API-PROD GET / X-ARR-LOG-ID=842cfff5-10af-439c-a74f-43fa3acb1a97 443 - 10.20.0.12 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:43:02 DEMO-API-PROD GET / X-ARR-LOG-ID=5761ca58-0be4-4e34-a7b5-c8b58a4db959 443 - 10.20.0.11 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:43:04 DEMO-API-PROD GET / X-ARR-LOG-ID=70df0731-8d12-4761-a5f8-b4daea14ff3a 443 - 10.20.0.12 - - - api.example.com 404 0 0 639 796 2
+2026-10-27 04:43:12 DEMO-API-PROD GET / X-ARR-LOG-ID=cd513e90-d92b-410e-a167-1162734be1a7 443 - 127.0.0.1 AlwaysOn ARRAffinity=1d3ca434cc9bb7fd48f7ba391a828af94b8f215a966865f656ef07e5e9a9f763 - api.example.com 404 0 0 639 910 222
+2026-10-27 04:43:16 ~1DEMO-API-PROD GET / - 80 - 10.20.0.5 AlwaysOn - - api.example.com 200 0 0 3260 484 4414
+2026-10-27 04:43:19 DEMO-API-PROD GET / X-ARR-LOG-ID=e20e564e-1173-4015-a5b3-9eb4ef29de25 443 - 10.20.0.12 - - - api.example.com 404 0 0 639 796 14
+2026-10-27 04:43:22 DEMO-API-PROD GET / X-ARR-LOG-ID=4855aaaa-f8dd-4905-ae12-781f32fe1e7f 443 - 127.0.0.1 AlwaysOn ARRAffinity=1d3ca434cc9bb7fd48f7ba391a828af94b8f215a966865f656ef07e5e9a9f763 - api.example.com 404 0 0 639 910 18
+2026-10-27 04:43:22 ~1DEMO-API-PROD GET / - 80 - 10.20.0.5 AlwaysOn - - api.example.com 200 0 0 3260 484 18
+2026-10-27 04:43:32 DEMO-API-PROD GET / X-ARR-LOG-ID=1650e23c-3318-45d7-ab78-f7afd78e3870 443 - 10.20.0.11 - - - api.example.com 404 0 0 639 796 3
