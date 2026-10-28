@@ -5,10 +5,11 @@ export interface Prefs {
   density: Density;
   theme: ThemePref;
   slowThresholdMs: number;
+  insightsOpen: boolean;
 }
 
 const KEY = 'log-viewer:prefs';
-const DEFAULTS: Prefs = { density: 'compact', theme: 'system', slowThresholdMs: 1000 };
+const DEFAULTS: Prefs = { density: 'compact', theme: 'system', slowThresholdMs: 1000, insightsOpen: true };
 
 /** Per-browser UI preferences. Storage may be unavailable (private mode), so every access is guarded. */
 export function loadPrefs(): Prefs {
@@ -21,6 +22,7 @@ export function loadPrefs(): Prefs {
       theme: p.theme === 'light' || p.theme === 'dark' ? p.theme : 'system',
       slowThresholdMs:
         typeof p.slowThresholdMs === 'number' && p.slowThresholdMs >= 0 ? p.slowThresholdMs : DEFAULTS.slowThresholdMs,
+      insightsOpen: p.insightsOpen !== false,
     };
   } catch {
     return { ...DEFAULTS };

@@ -3,6 +3,7 @@ import { DropZone, ParseProgress } from './components/DropZone';
 import { FileInfo } from './components/FileInfo';
 import { FilterChips } from './components/FilterChips';
 import { FilterSidebar } from './components/FilterSidebar';
+import { InsightsPanel } from './components/InsightsPanel';
 import { LogTable } from './components/LogTable';
 import { MalformedList } from './components/MalformedList';
 import { RowDetailPanel } from './components/RowDetailPanel';
@@ -24,6 +25,8 @@ export default function App() {
   const indices = useDisplayIndices();
   const highlight = useSearchHighlight();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const insightsOpen = useLogStore((s) => s.insightsOpen);
+  const setInsightsOpen = useLogStore((s) => s.setInsightsOpen);
 
   useUrlSync();
 
@@ -69,6 +72,22 @@ export default function App() {
                 <SearchBox />
               </TableToolbar>
               <FilterChips />
+              <section className={'insights-wrap' + (insightsOpen ? ' open' : '')} aria-label="Insights">
+                <button
+                  type="button"
+                  className="insights-toggle"
+                  aria-expanded={insightsOpen}
+                  aria-controls="insights-body"
+                  onClick={() => setInsightsOpen(!insightsOpen)}
+                >
+                  <span aria-hidden="true">{insightsOpen ? '▾' : '▸'}</span> Insights
+                </button>
+                {insightsOpen && (
+                  <div id="insights-body">
+                    <InsightsPanel />
+                  </div>
+                )}
+              </section>
               {tab === 'rows' ? (
                 <div role="tabpanel" id="panel-rows" aria-labelledby="tab-rows" className="tab-panel">
                   <LogTable rows={rows} indices={indices} columns={columns} highlight={highlight} />

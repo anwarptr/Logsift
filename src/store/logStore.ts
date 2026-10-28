@@ -47,6 +47,7 @@ export interface LogState {
   density: Density;
   theme: ThemePref;
   slowThresholdMs: number;
+  insightsOpen: boolean;
 
   // --- filters ---
   filters: FilterState;
@@ -70,6 +71,7 @@ export interface LogState {
   setDensity(d: Density): void;
   setTheme(t: ThemePref): void;
   setSlowThreshold(ms: number): void;
+  setInsightsOpen(open: boolean): void;
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt'];
@@ -196,6 +198,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     density: prefs.density,
     theme: prefs.theme,
     slowThresholdMs: prefs.slowThresholdMs,
+    insightsOpen: prefs.insightsOpen,
 
     filters: initialFilters,
     keepFiltersOnLoad: hasActiveFilters(initialFilters),
@@ -286,6 +289,11 @@ export const useLogStore = create<LogState>()((set, get) => {
     setTheme(theme) {
       set({ theme });
       savePrefs({ theme });
+    },
+
+    setInsightsOpen(insightsOpen) {
+      set({ insightsOpen });
+      savePrefs({ insightsOpen });
     },
 
     setSlowThreshold(ms) {

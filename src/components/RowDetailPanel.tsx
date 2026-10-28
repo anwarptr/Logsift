@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ColumnDef, LogRow } from '../parser';
 import { useLogStore } from '../store/logStore';
 import { copyText } from '../utils/clipboard';
+import { rowToJson } from '../utils/export';
 import { cellText } from './cells';
-
-export function rowToJson(row: LogRow, schema: ColumnDef[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const c of schema) {
-    if (!(c.key in row.values)) continue;
-    const v = row.values[c.key] ?? null;
-    out[c.key] = c.type === 'timestamp' && typeof v === 'number' ? new Date(v).toISOString() : v;
-  }
-  return out;
-}
 
 export function RowDetailPanel() {
   const selectedId = useLogStore((s) => s.selectedId);

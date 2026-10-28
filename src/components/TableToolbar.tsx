@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useLogStore } from '../store/logStore';
 import { formatNumber } from '../utils/format';
 import { ColumnChooser } from './ColumnChooser';
+import { ExportMenu } from './ExportMenu';
 
 export function TableToolbar({ children }: { children?: ReactNode }) {
   const tab = useLogStore((s) => s.tab);
@@ -66,6 +67,7 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
           {density === 'compact' ? 'Compact' : 'Comfortable'}
         </button>
         <ColumnChooser />
+        {tab === 'rows' && <ExportMenu />}
       </div>
     </div>
   );

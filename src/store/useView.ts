@@ -3,6 +3,7 @@ import { compileSearch, evaluateFilters, type FilterEval } from '../filters/appl
 import { buildLogIndex, type LogIndex } from '../filters/logIndex';
 import type { FilterState } from '../filters/types';
 import type { ColumnDef, LogRow } from '../parser';
+import { computeInsights, type Insights } from '../utils/insights';
 import { sortIndices } from '../utils/sort';
 import { useLogStore } from './logStore';
 
@@ -66,6 +67,19 @@ export function useDisplayIndices(): Uint32Array {
   const matched = useMatchedIndices();
   const col = sort ? schema.find((c) => c.key === sort.key) : undefined;
   return getSorted(rows, matched, col, sort?.dir);
+}
+
+const getInsights = memoLast((rows: LogRow[], schema: ColumnDef[], index: LogIndex, matched: Uint32Array) =>
+  computeInsights(rows, schema, index, matched),
+);
+
+/** Insights over the filtered rows; null while loading. */
+export function useInsights(): Insights | null {
+  const rows = useLogStore((s) => s.rows);
+  const schema = useLogStore((s) => s.schema);
+  const index = useLogIndex();
+  const ev = useFilterEval();
+  return index && ev ? getInsights(rows, schema, index, ev.matched) : null;
 }
 
 export function useSearchHighlight(): RegExp | null {
