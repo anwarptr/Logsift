@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLogStore } from '../store/logStore';
 
-function isEditable(el: Element | null): boolean {
+export function isEditable(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;

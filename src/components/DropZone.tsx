@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import sampleIis from '../../fixtures/sample-iis.log?raw';
 import { ACCEPTED_EXTENSIONS, useLogStore } from '../store/logStore';
 import { formatBytes, formatNumber } from '../utils/format';
+import { isEditable } from '../utils/useShortcuts';
+import { PasteDialog } from './PasteDialog';
 
 export function loadSample(): void {
   useLogStore.getState().loadFile(new File([sampleIis], 'sample-iis.log', { type: 'text/plain' }));
@@ -10,9 +12,11 @@ export function loadSample(): void {
 /** File picker + drag-and-drop target. In compact mode it renders as toolbar buttons. */
 export function DropZone({ compact = false }: { compact?: boolean }) {
   const loadFile = useLogStore((s) => s.loadFile);
+  const loadText = useLogStore((s) => s.loadText);
   const setError = useLogStore((s) => s.setError);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [pasting, setPasting] = useState(false);
 
   // Accept drops anywhere on the window, not only on the visible zone.
   useEffect(() => {
@@ -43,17 +47,29 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       }
       loadFile(files[0]!);
     };
+    // Ctrl+V anywhere outside a text field loads the clipboard (a copied file or plain text).
+    const onPaste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || isEditable(document.activeElement) || !e.clipboardData) return;
+      const file = e.clipboardData.files[0];
+      const text = e.clipboardData.getData('text/plain');
+      if (!file && !text) return;
+      e.preventDefault();
+      if (file) loadFile(file);
+      else loadText(text);
+    };
     window.addEventListener('dragenter', onEnter);
     window.addEventListener('dragleave', onLeave);
     window.addEventListener('dragover', onOver);
     window.addEventListener('drop', onDrop);
+    window.addEventListener('paste', onPaste);
     return () => {
       window.removeEventListener('dragenter', onEnter);
       window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('dragover', onOver);
       window.removeEventListener('drop', onDrop);
+      window.removeEventListener('paste', onPaste);
     };
-  }, [loadFile, setError]);
+  }, [loadFile, loadText, setError]);
 
   const input = (
     <input
@@ -77,14 +93,23 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
     </div>
   );
 
+  const pasteButton = (
+    <button type="button" className="btn" aria-haspopup="dialog" onClick={() => setPasting(true)}>
+      Paste text…
+    </button>
+  );
+  const pasteDialog = pasting && <PasteDialog onClose={() => setPasting(false)} />;
+
   if (compact) {
     return (
       <>
         <button type="button" className="btn" onClick={() => inputRef.current?.click()}>
           Open file…
         </button>
+        {pasteButton}
         {input}
         {overlay}
+        {pasteDialog}
       </>
     );
   }
@@ -102,17 +127,22 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
         />
       </svg>
       <h2>Drop a log file here</h2>
-      <p className="muted">IIS W3C, Apache/Nginx, JSON lines or plain text logs (.log, .txt). Files are parsed locally and never uploaded.</p>
+      <p className="muted">
+        IIS W3C, Apache/Nginx, JSON lines or plain text logs (.log, .txt), or paste log text (Ctrl+V). Everything is
+        parsed locally and never uploaded.
+      </p>
       <div className="dropzone-actions">
         <button type="button" className="btn primary" onClick={() => inputRef.current?.click()}>
           Choose file…
         </button>
+        {pasteButton}
         <button type="button" className="btn" onClick={loadSample}>
           Load sample data
         </button>
       </div>
       {input}
       {overlay}
+      {pasteDialog}
     </section>
   );
 }

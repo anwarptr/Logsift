@@ -305,6 +305,64 @@ input[type='checkbox'] {
   backdrop-filter: blur(2px);
 }
 
+/* ---------- Paste dialog ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(880px, 100%);
+  max-height: calc(100vh - 32px);
+  padding: 16px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+.modal h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.modal p {
+  margin: 0;
+  font-size: 13px;
+}
+.paste-dialog textarea {
+  flex: 1;
+  min-height: 240px;
+  height: 50vh;
+  resize: vertical;
+  padding: 8px;
+  font: 12px/1.5 var(--mono);
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.paste-dialog textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-footer > :first-child {
+  margin-right: auto;
+  font-size: 13px;
+}
+
 /* ---------- Progress ---------- */
 .progress-wrap {
   padding: 12px 16px;

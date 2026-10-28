@@ -55,6 +55,8 @@ export interface LogState {
   keepFiltersOnLoad: boolean;
 
   loadFile(file: File): void;
+  /** Parse pasted text exactly like a file (same worker pipeline). */
+  loadText(text: string): void;
   setFilters(patch: Partial<FilterState>): void;
   replaceFilters(f: FilterState): void;
   clearFilters(): void;
@@ -75,6 +77,9 @@ export interface LogState {
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt'];
+
+/** Display name for text pasted instead of a file (also the base of export file names). */
+export const PASTED_NAME = 'pasted-text.txt';
 
 export function isAcceptedFile(name: string): boolean {
   const lower = name.toLowerCase();
@@ -225,6 +230,15 @@ export const useLogStore = create<LogState>()((set, get) => {
         return;
       }
       parse(file, { name: file.name, size: file.size }, get().formatOverride, true);
+    },
+
+    loadText(text) {
+      if (text.trim() === '') {
+        set({ error: 'The pasted text is empty.' });
+        return;
+      }
+      const blob = new Blob([text], { type: 'text/plain' });
+      parse(blob, { name: PASTED_NAME, size: blob.size }, get().formatOverride, true);
     },
 
     setFormatOverride(format) {

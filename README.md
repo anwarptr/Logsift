@@ -19,8 +19,9 @@ npm run test:perf    # 500k-line parse benchmark (logs timings)
 npm run gen:iis -- 500000 big.log   # write a synthetic IIS log to try in the UI
 ```
 
-Open the app, then drop a `.log`/`.txt` file anywhere on the page, use **Choose file…**, or click
-**Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
+Open the app, then drop a `.log`/`.txt` file anywhere on the page, use **Choose file…**, paste log text
+(**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click **Load sample data** (loads
+`fixtures/sample-iis.log`, bundled into the app).
 
 ## Supported formats
 
@@ -45,7 +46,7 @@ re-parses the file with a forced format.
 
 ## Features
 
-- **File input**: drag-and-drop or picker (`.log`/`.txt` only), progress bar while parsing, file name / size /
+- **File input**: drag-and-drop or picker (`.log`/`.txt` only), or pasted text, progress bar while parsing, file name / size /
   rows parsed / lines skipped / detected format / parse time, metadata (`#`) lines, clear errors for wrong type,
   empty, binary or unparseable files.
 - **Table**: virtualized (tested to stay smooth at 500k rows), sticky header, click-to-sort (asc → desc → off),
@@ -142,6 +143,11 @@ insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap af
 - **Indexing waits for parsing to finish**: during a load the table shows rows as they arrive, unfiltered;
   filters, facets and insights appear once the file is fully parsed (rebuilding the index for every batch
   would waste main-thread time).
+- **Pasted text** goes through the same worker pipeline as a file (wrapped in a `Blob`), so format detection,
+  the format override and every feature work the same. It is shown as `pasted-text.txt`, and exports are named
+  `pasted-text-filtered.csv/json`. Ctrl+V outside a text field loads the clipboard immediately (a copied file is
+  opened as a file); the **Paste text…** dialog lets you review or edit the text first (Ctrl+Enter parses).
+  Pasting replaces the current data, like opening a new file.
 - **Preferences** (theme, density, slow threshold, insights open) live in `localStorage`; failures are ignored.
 
 ## Known limitations

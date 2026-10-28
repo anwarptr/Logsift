@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import sampleApache from '../../fixtures/sample-apache.log?raw';
+import sampleJsonl from '../../fixtures/sample-jsonl.log?raw';
 import type { LogFormat } from '../../src/parser';
 import type { WorkerResponse } from '../../src/worker/protocol';
 
@@ -100,5 +102,53 @@ describe('App with the sample IIS log', () => {
     const insights = screen.getByLabelText('Insights for the filtered rows');
     expect(insights.textContent).toContain('Total requests3');
     expect(insights.textContent).toContain('Error rate0%');
+  });
+});
+
+describe('pasting text instead of a file', () => {
+  it('parses text entered in the paste dialog', async () => {
+    await loadSample();
+    fireEvent.click(screen.getByRole('button', { name: 'Paste text…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Paste log text' });
+    const parse = within(dialog).getByRole('button', { name: 'Parse text' }) as HTMLButtonElement;
+    expect(parse.disabled).toBe(true);
+
+    fireEvent.change(within(dialog).getByLabelText('Log text'), { target: { value: sampleApache } });
+    expect(dialog.textContent).toContain('6 lines');
+    fireEvent.click(parse);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(rowCount()).toBe('6 of 6 rows'));
+    expect(screen.getByLabelText('File information').textContent).toContain('pasted-text.txt');
+    expect((screen.getByLabelText('Format') as HTMLSelectElement).selectedOptions[0]!.textContent).toContain('Apache');
+  });
+
+  it('Escape closes the dialog without loading anything', async () => {
+    await loadSample();
+    fireEvent.click(screen.getByRole('button', { name: 'Paste text…' }));
+    fireEvent.keyDown(screen.getByLabelText('Log text'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(rowCount()).toBe('16 of 16 rows');
+  });
+
+  it('Ctrl+V outside a text field loads the clipboard text', async () => {
+    await loadSample();
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: { files: [], getData: (t: string) => (t === 'text/plain' ? sampleJsonl : '') },
+    });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() => expect(rowCount()).toBe('5 of 5 rows'));
+    expect(screen.getByLabelText('File information').textContent).toContain('pasted-text.txt');
+  });
+
+  it('rejects empty pasted text', async () => {
+    const { useLogStore } = await import('../../src/store/logStore');
+    act(() => useLogStore.getState().loadText('  \n\n'));
+    expect(useLogStore.getState().error).toBe('The pasted text is empty.');
+    act(() => useLogStore.getState().setError(null));
   });
 });
