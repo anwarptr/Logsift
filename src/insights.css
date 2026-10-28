@@ -158,6 +158,14 @@
   margin: 0;
   padding: 0;
 }
+.bar-list li {
+  display: flex;
+  align-items: center;
+}
+.bar-list li > .bar-row {
+  flex: 1;
+  min-width: 0;
+}
 .bar-row {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(40px, 1fr) auto;

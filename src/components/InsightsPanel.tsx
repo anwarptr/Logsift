@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react';
 import type { FacetEntry } from '../filters/facets';
 import { useLogStore } from '../store/logStore';
 import { useDisplayZone, useInsights } from '../store/useView';
 import { formatBytes, formatNumber, formatTimestamp } from '../utils/format';
 import { levelClass, statusClass } from './cells';
 import { Histogram } from './Histogram';
+import { IpInfo } from './IpInfo';
 
 function Card({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -20,12 +22,15 @@ function BarList({
   entries,
   onPick,
   pillClass,
+  extra,
   mono = true,
 }: {
   title: string;
   entries: FacetEntry[];
   onPick?(key: string): void;
   pillClass?(key: string): string;
+  /** Rendered after the row button (e.g. a link, which can't be nested in the button). */
+  extra?(entry: FacetEntry): ReactNode;
   mono?: boolean;
 }) {
   const max = entries[0]?.count ?? 1;
@@ -53,6 +58,7 @@ function BarList({
                 </span>
                 <span className="bar-count">{formatNumber(e.count)}</span>
               </button>
+              {extra?.(e)}
             </li>
           ))}
         </ul>
@@ -128,7 +134,14 @@ export function InsightsPanel() {
         {uriKey && (
           <BarList title="Top URIs" entries={ins.topUris} onPick={(u) => setFilters({ uri: u, uriMode: 'equals' })} />
         )}
-        {ipKey && <BarList title="Top client IPs" entries={ins.topIps} onPick={addFacet(ipKey)} />}
+        {ipKey && (
+          <BarList
+            title="Top client IPs"
+            entries={ins.topIps}
+            onPick={addFacet(ipKey)}
+            extra={(e) => <IpInfo ip={e.label} compact />}
+          />
+        )}
         {ins.slowest.length > 0 && (
           <div className="bar-list">
             <div className="chart-title">Slowest {noun}</div>

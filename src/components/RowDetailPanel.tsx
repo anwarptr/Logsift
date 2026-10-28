@@ -4,6 +4,7 @@ import { useDisplayZone } from '../store/useView';
 import { copyText } from '../utils/clipboard';
 import { rowToJson } from '../utils/export';
 import { cellText } from './cells';
+import { IpInfo } from './IpInfo';
 
 export function RowDetailPanel() {
   const selectedId = useLogStore((s) => s.selectedId);
@@ -64,6 +65,7 @@ export function RowDetailPanel() {
               </dt>
               <dd className={v === null ? 'null' : undefined}>
                 {v === null ? '-' : c.role === 'message' ? <pre>{cellText(c, v, zone)}</pre> : cellText(c, v, zone)}
+                {c.role === 'clientIp' && typeof v === 'string' && <IpInfo ip={v} />}
               </dd>
             </div>
           );

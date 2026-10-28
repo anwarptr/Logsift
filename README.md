@@ -73,6 +73,9 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   requests-over-time histogram with automatic bucket size, errors stacked in red, hover tooltip, and
   click/drag to set the time filter; status (or level) distribution, top 10 URIs, top 10 client IPs (click any
   bar to filter), 10 slowest requests (click to jump to the row).
+- **IP details**: the row details label each client IP's type, worked out offline (Private network, Loopback,
+  Link-local, Carrier-grade NAT). Public IPs get a **Look up ↗** link to ipinfo.io (country, owner/ASN), also shown
+  as ↗ in the IP filter list and Top client IPs. IPv4, IPv6, `[v6]:port` and `v4:port` are recognised.
 - **Export** the filtered rows in the current sort order to CSV (visible columns) or JSON (all fields + line number).
 - **Theme**: follows the system by default; toggle cycles system → light → dark (remembered per browser).
 - **Shortcuts**: `/` focuses search, `Esc` closes the detail panel / clears the selection (and blurs search),
@@ -146,6 +149,9 @@ insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap af
   to be read as browser-local time by `Date.parse`; they are now read as UTC like the generic parser.
 - **Exports carry an explicit offset** in the current display zone (`2026-10-27T08:42:02.120+04:00`, or `…Z`
   for UTC), so they are unambiguous whichever view was active.
+- **IP details are links, not lookups.** There is no bundled GeoIP database and no automatic online lookup, so no
+  IP leaves the machine on its own. Address types are classified offline from the reserved ranges; for public
+  addresses, ipinfo.io receives the address only when you click its **Look up ↗** link (new tab, `noopener`).
 - **`date` + `time` are replaced** by a single `timestamp` column (the raw line still has the originals).
 - **IIS `+` encoding is kept** as stored (e.g. `Mozilla/5.0+(Windows…)`), so values match the file and search
   works on what you see in the raw line.

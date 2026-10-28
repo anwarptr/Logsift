@@ -118,6 +118,12 @@
 }
 .facet-list li {
   position: relative;
+  display: flex;
+  align-items: center;
+}
+.facet-list li > label {
+  flex: 1;
+  min-width: 0;
 }
 .facet-list li.zero {
   opacity: 0.5;

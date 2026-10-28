@@ -7,6 +7,7 @@ import { useLogStore } from '../store/logStore';
 import { useDisplayZone, useFilterEval, useLogIndex } from '../store/useView';
 import { formatNumber, formatTimestamp } from '../utils/format';
 import { displayZoneLabel, fromZonedInput, toZonedInput } from '../utils/timezone';
+import { IpInfo } from './IpInfo';
 
 const FACET_PREVIEW = 8;
 
@@ -158,7 +159,7 @@ function StatusChips({ index, ev }: { index: LogIndex; ev: FilterEval }) {
   );
 }
 
-function FacetList({ col, ev }: { col: FacetColumn; ev: FilterEval }) {
+function FacetList({ col, ev, ipLookup = false }: { col: FacetColumn; ev: FilterEval; ipLookup?: boolean }) {
   const selected = useLogStore((s) => s.filters.facets[col.key]);
   const setFilters = useLogStore((s) => s.setFilters);
   const facets = useLogStore((s) => s.filters.facets);
@@ -209,6 +210,7 @@ function FacetList({ col, ev }: { col: FacetColumn; ev: FilterEval }) {
               <span className="facet-count">{formatNumber(e.count)}</span>
               <span className="facet-bar" style={{ width: `${(e.count / max) * 100}%` }} aria-hidden="true" />
             </label>
+            {ipLookup && <IpInfo ip={e.label} compact />}
           </li>
         ))}
         {shown.length === 0 && <li className="muted small-text">No matching values</li>}
@@ -402,6 +404,7 @@ export function FilterSidebar() {
   const statusKey = schema.find((c) => c.role === 'status')?.key;
   const statusFacet = index.facets.find((f) => f.key === statusKey);
   const otherFacets = index.facets.filter((f) => f.key !== statusKey);
+  const ipKey = schema.find((c) => c.role === 'clientIp')?.key;
 
   return (
     <aside className="sidebar" aria-label="Filters">
@@ -415,7 +418,7 @@ export function FilterSidebar() {
       )}
       {otherFacets.map((f) => (
         <Section key={f.key} title={f.label}>
-          <FacetList col={f} ev={ev} />
+          <FacetList col={f} ev={ev} ipLookup={f.key === ipKey} />
         </Section>
       ))}
       {index.ranges.length > 0 && (

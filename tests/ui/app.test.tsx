@@ -127,6 +127,46 @@ describe('time zone', () => {
   });
 });
 
+describe('IP details', () => {
+  it('labels private addresses and offers no look-up for them', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const row = useLogStore.getState().rows.find((r) => r.values['c-ip'] === '10.20.0.5')!;
+    act(() => useLogStore.getState().select(row.id));
+    const details = screen.getByRole('complementary', { name: `Details for line ${row.lineNo}` });
+    expect(details.textContent).toContain('Private network');
+    expect(within(details).queryByRole('link')).toBeNull();
+    expect(within(screen.getByRole('list', { name: 'c-ip values' })).queryByRole('link')).toBeNull();
+    act(() => useLogStore.getState().select(null));
+  });
+
+  it('links public addresses to ipinfo.io', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const log =
+      '8.8.8.8 - - [27/Oct/2026:04:42:02 +0000] "GET / HTTP/1.1" 200 512 "-" "curl/8"\n' +
+      '10.0.0.7 - - [27/Oct/2026:04:42:03 +0000] "GET /a HTTP/1.1" 404 0 "-" "curl/8"\n';
+    act(() => useLogStore.getState().loadText(log));
+    await waitFor(() => expect(rowCount()).toBe('2 of 2 rows'));
+
+    const facet = screen.getByRole('list', { name: 'c-ip values' });
+    const links = within(facet).getAllByRole('link');
+    expect(links).toHaveLength(1); // only the public address
+    expect(links[0]!.getAttribute('href')).toBe('https://ipinfo.io/8.8.8.8');
+    expect(links[0]!.getAttribute('target')).toBe('_blank');
+    expect(links[0]!.getAttribute('rel')).toContain('noopener');
+
+    const insights = screen.getByLabelText('Insights for the filtered rows');
+    expect(within(insights).getByRole('link', { name: /Look up 8\.8\.8\.8/ })).toBeTruthy();
+
+    const row = useLogStore.getState().rows.find((r) => r.values['c-ip'] === '8.8.8.8')!;
+    act(() => useLogStore.getState().select(row.id));
+    const details = screen.getByRole('complementary', { name: `Details for line ${row.lineNo}` });
+    expect(within(details).getByRole('link', { name: /Look up 8\.8\.8\.8/ }).textContent).toBe('Look up ↗');
+    act(() => useLogStore.getState().select(null));
+  });
+});
+
 describe('pasting text instead of a file', () => {
   it('parses text entered in the paste dialog', async () => {
     await loadSample();
