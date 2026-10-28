@@ -87,7 +87,7 @@ All filters are generated from the detected schema and the data (not hard-coded 
 | Filter | Details |
 | --- | --- |
 | Global search | Case-insensitive, over the raw line; `.*` toggles regex mode. Invalid regexes show an inline error and are ignored (never crash). Matches are highlighted in the table. |
-| Time range (UTC) | From/To bounded by the file's min/max timestamp; presets: first 5 min, last 5 min, last 1 h, all. Also set by dragging on the histogram. |
+| Time range | In the current display zone (log time or local). From/To bounded by the file's min/max timestamp; presets: first 5 min, last 5 min, last 1 h, all. Also set by dragging on the histogram. |
 | Facets | Any column with fewer than 200 distinct values (e.g. `cs-method`, `sc-status`, `s-port`, `c-ip`, `s-sitename`, `cs-host`, `cs-username`, `level`, `logger`). Multi-select (OR within a column), live counts, in-list search when > 8 values. Entirely empty columns are skipped. |
 | Status classes | 2xx / 3xx / 4xx / 5xx chips with counts. |
 | Numeric ranges | Dual sliders + number inputs for duration/bytes columns (`time-taken`, `sc-bytes`, `cs-bytes`) and any other high-cardinality numeric column. Bounds come from the data. |
