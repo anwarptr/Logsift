@@ -14,6 +14,12 @@ export class SchemaBuilder {
     return this.cols.has(key);
   }
 
+  /** Change the role of an existing column (e.g. when a better source for that role appears). */
+  setRole(key: string, role: ColumnRole | undefined): void {
+    const col = this.cols.get(key);
+    if (col) col.role = role;
+  }
+
   /** Register a column from an observed value, widening its type to string on conflict. */
   observe(key: string, value: CellValue, role?: ColumnRole): void {
     const existing = this.cols.get(key);

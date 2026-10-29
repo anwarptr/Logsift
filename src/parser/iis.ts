@@ -1,3 +1,4 @@
+import { classifyIp, normalizeIp } from '../utils/ip';
 import { SchemaBuilder, TIMESTAMP_COLUMN } from './schema';
 import { IIS_TIME_ZONE } from './timezone';
 import type { CellValue, ColumnDef, ColumnRole, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
@@ -26,6 +27,39 @@ const FIELD_ROLES: Record<string, ColumnRole> = {
   'cs(User-Agent)': 'userAgent',
 };
 
+/**
+ * Headers that carry the original client address when IIS sits behind a proxy (Azure Front Door,
+ * Application Gateway, ARR, a CDN). In priority order: single-address headers first, then the
+ * X-Forwarded-For chain. Matched case-insensitively, with or without the cs(...) wrapper.
+ */
+const FORWARDED_HEADERS = [
+  'x-azure-clientip',
+  'true-client-ip',
+  'cf-connecting-ip',
+  'x-real-ip',
+  'x-client-ip',
+  'x-forwarded-for',
+  'x-original-forwarded-for',
+];
+
+function forwardedHeaderIndex(fields: string[]): number {
+  const names = fields.map((f) => f.toLowerCase().replace(/^cs\((.*)\)$/, '$1'));
+  for (const h of FORWARDED_HEADERS) {
+    const i = names.indexOf(h);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+/** First address in a forwarded header ("203.0.113.7,+10.0.0.4", IIS writes spaces as "+"), without a port. */
+export function firstForwardedIp(value: string): string | null {
+  if (value === '-') return null;
+  const first = value.split(/[,+\s]+/).find(Boolean);
+  if (!first) return null;
+  const ip = normalizeIp(first);
+  return classifyIp(ip) === 'invalid' ? null : ip;
+}
+
 const ARR_LOG_ID_RE = /X-ARR-LOG-ID=([0-9a-fA-F-]{36})/;
 const SCM_PREFIX = '~1';
 
@@ -44,6 +78,8 @@ interface FieldPlan {
   queryIdx: number;
   uaIdx: number;
   ipIdx: number;
+  /** Forwarded-for header field, or -1. */
+  fwdIdx: number;
 }
 
 /** Parse IIS "YYYY-MM-DD" + "HH:MM:SS[.fff]" (always UTC in W3C logs) into epoch ms. */
@@ -75,6 +111,7 @@ export function createIisParser(): LineParser {
     const dateIdx = fields.indexOf('date');
     const timeIdx = fields.indexOf('time');
     const hasTs = dateIdx >= 0 && timeIdx >= 0;
+    const fwdIdx = forwardedHeaderIndex(fields);
     const kinds: number[] = [];
     fields.forEach((f, i) => {
       if (hasTs && (i === dateIdx || i === timeIdx)) {
@@ -84,7 +121,9 @@ export function createIisParser(): LineParser {
       }
       const numeric = NUMERIC_FIELDS.has(f);
       kinds.push(f === 's-sitename' ? KIND_SITE : numeric ? KIND_NUM : KIND_STR);
-      schema.add({ key: f, label: f, type: numeric ? 'number' : 'string', role: FIELD_ROLES[f] });
+      // With a forwarded-for header, c-ip is the proxy; the derived clientIp column takes the role.
+      const role = f === 'c-ip' && fwdIdx >= 0 ? undefined : FIELD_ROLES[f];
+      schema.add({ key: f, label: f, type: numeric ? 'number' : 'string', role });
     });
     const p: FieldPlan = {
       n: fields.length,
@@ -96,12 +135,18 @@ export function createIisParser(): LineParser {
       queryIdx: fields.indexOf('cs-uri-query'),
       uaIdx: fields.indexOf('cs(User-Agent)'),
       ipIdx: fields.indexOf('c-ip'),
+      fwdIdx,
     };
     const derived: ColumnDef[] = [];
     if (p.siteIdx >= 0) derived.push({ key: 'isScm', label: 'isScm', type: 'boolean', role: 'scm', derived: true });
     if (p.queryIdx >= 0) derived.push({ key: 'arrLogId', label: 'arrLogId', type: 'string', derived: true });
     if (p.uaIdx >= 0 || p.ipIdx >= 0)
       derived.push({ key: 'isHealthCheck', label: 'isHealthCheck', type: 'boolean', role: 'healthCheck', derived: true });
+    if (fwdIdx >= 0) {
+      derived.push({ key: 'clientIp', label: 'clientIp', type: 'string', role: 'clientIp', derived: true });
+      // c-ip may already carry the role from an earlier #Fields block.
+      schema.setRole('c-ip', undefined);
+    }
     derived.forEach((d) => schema.add(d));
     plan = p;
   }
@@ -164,6 +209,10 @@ export function createIisParser(): LineParser {
     if (plan.uaIdx >= 0 || plan.ipIdx >= 0) {
       values.isHealthCheck =
         (plan.uaIdx >= 0 && parts[plan.uaIdx] === 'AlwaysOn') || (plan.ipIdx >= 0 && parts[plan.ipIdx] === '127.0.0.1');
+    }
+    if (plan.fwdIdx >= 0) {
+      const proxy = plan.ipIdx >= 0 ? parts[plan.ipIdx]! : '-';
+      values.clientIp = firstForwardedIp(parts[plan.fwdIdx]!) ?? (proxy === '-' ? null : proxy);
     }
     rows.push({ id: rowId++, lineNo, ts, values, raw: line });
   }

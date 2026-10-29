@@ -67,7 +67,14 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 
 - `s-sitename` with the `~1` prefix (Azure SCM/Kudu site) is stripped, and a derived boolean **`isScm`** is added.
 - `X-ARR-LOG-ID=<guid>` in `cs-uri-query` is extracted into the derived, searchable **`arrLogId`** column.
-- Derived **`isHealthCheck`**: user-agent is `AlwaysOn` or client IP is `127.0.0.1`.
+- Derived **`isHealthCheck`**: user-agent is `AlwaysOn` or `c-ip` is `127.0.0.1`.
+- **Real client IP behind a proxy.** Behind Azure Front Door, Application Gateway or ARR, `c-ip` is the proxy's
+  (usually private) address. If the log has a forwarded-for field — `X-Azure-ClientIP`, `True-Client-IP`,
+  `CF-Connecting-IP`, `X-Real-IP`, `X-Client-IP`, `X-Forwarded-For` or `X-Original-Forwarded-For` (in that
+  priority, with or without `cs(...)`, any case) — a derived **`clientIp`** column holds the first address of it
+  (port and brackets stripped), falling back to `c-ip` when the header is empty or not an IP. `clientIp` then becomes
+  the client IP used by the IP filter, Top client IPs and look-up links; `c-ip` stays as an ordinary column.
+  IIS only logs these headers if they're added as custom fields (IIS Manager → Logging → Select Fields → Add Field).
 - Lines whose field count doesn't match the current `#Fields:` are kept as **malformed** rows (with the raw line and the
   reason) in the **Malformed** tab. Nothing is dropped silently; blank lines are the only lines ignored.
 - Every row keeps its original raw line (row detail → **Copy raw line**).

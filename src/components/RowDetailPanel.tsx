@@ -68,7 +68,7 @@ export function RowDetailPanel() {
               </dt>
               <dd className={v === null ? 'null' : undefined}>
                 {v === null ? '-' : c.role === 'message' ? <pre>{cellText(c, v, zone)}</pre> : cellText(c, v, zone)}
-                {c.role === 'clientIp' && typeof v === 'string' && <IpInfo ip={v} />}
+                {(c.role === 'clientIp' || c.key === 'c-ip') && typeof v === 'string' && <IpInfo ip={v} />}
               </dd>
             </div>
           );
