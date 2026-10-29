@@ -122,11 +122,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
         />
       </svg>
       <h2>Drop log files here</h2>
-      <p className="muted">
-        IIS W3C, Apache/Nginx, JSON lines or plain text logs (.log, .txt, or compressed .gz/.zip). Several files are
-        merged into one timeline. You can also paste log text (Ctrl+V). Everything is parsed locally and never
-        uploaded.
-      </p>
+      <p className="muted">.log and .txt files, or .gz/.zip archives of them. Nothing leaves your computer.</p>
       <div className="dropzone-actions">
         <button type="button" className="btn primary" onClick={() => inputRef.current?.click()}>
           Choose files…

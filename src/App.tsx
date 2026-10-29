@@ -3,6 +3,7 @@ import { EndpointsTable } from './components/EndpointsTable';
 import { FileInfo } from './components/FileInfo';
 import { FilterChips } from './components/FilterChips';
 import { FilterSidebar } from './components/FilterSidebar';
+import { HomePage } from './components/HomePage';
 import { InsightsPanel } from './components/InsightsPanel';
 import { LogTable } from './components/LogTable';
 import { MalformedList } from './components/MalformedList';
@@ -147,7 +148,7 @@ export default function App() {
       ) : (
         status !== 'loading' && (
           <main className="app-main empty">
-            <DropZone />
+            <HomePage />
           </main>
         )
       )}
