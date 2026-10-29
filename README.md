@@ -36,6 +36,15 @@ stay per file, and the row details and Malformed tab show the file name.
 - Decompression uses the browser's built-in `DecompressionStream`, so it adds no code and nothing is uploaded.
 - Empty or unsupported files in a selection are skipped with a notice; the rest still open.
 
+### Hosted version, CI and deployment
+
+`.github/workflows/ci.yml` runs on every push and pull request: `npm ci`, type check, tests and production build
+(Node 24). On `main`, a green build is then deployed to GitHub Pages at
+**https://anwar-sobha.github.io/LogViewer/**. The site is static: files you open are still parsed only in your
+browser. One-time setup: in the repository's **Settings → Pages → Build and deployment**, set **Source** to
+**GitHub Actions** (until then the deploy job fails while the checks still run). The perf benchmark is not part
+of CI (timings on shared runners are too noisy to gate on).
+
 ## Supported formats
 
 The format is auto-detected from the first 50 non-blank lines; the **Format** dropdown in the file bar
