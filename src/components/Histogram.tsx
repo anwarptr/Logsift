@@ -71,7 +71,10 @@ export function Histogram({ data, onSelect }: { data: Timeline; onSelect(from: n
     onSelect(start + a * bucketMs, start + (b + 1) * bucketMs - 1);
   }
 
-  const hovered = hover !== null ? { i: hover, total: counts[hover]!, err: errors[hover]! } : null;
+  // The hovered bucket belongs to the data it was hovered on; after a filter or a new file the
+  // buckets change (often fewer of them), so drop it until the pointer moves again.
+  useEffect(() => setHover(null), [data]);
+  const hovered = hover !== null && hover < n ? { i: hover, total: counts[hover]!, err: errors[hover]! } : null;
   const dragX = drag ? Math.min(drag.x0, drag.x1) : 0;
   const dragW = drag ? Math.abs(drag.x1 - drag.x0) : 0;
 
