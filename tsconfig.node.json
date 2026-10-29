@@ -17,5 +17,5 @@
     "skipLibCheck": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["vite.config.ts", "vitest.perf.config.ts", "tests", "scripts"]
+  "include": ["vite.config.ts", "vitest.perf.config.ts", "tests", "scripts", "src/env.d.ts"]
 }

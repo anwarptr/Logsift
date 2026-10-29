@@ -1,5 +1,7 @@
 import { DropZone } from './DropZone';
 
+const REPO_URL = 'https://github.com/anwar-sobha/LogViewer';
+
 const FORMATS = ['IIS W3C', 'Apache / Nginx', 'Serilog', 'JSON / JSON lines', 'Plain text', '.gz / .zip'];
 
 const FEATURES = [
@@ -47,6 +49,20 @@ export function HomePage() {
         Tip: drop several files to merge them into one timeline, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere to
         paste log text.
       </p>
+
+      <footer className="home-footer">
+        <span>Logsift v{__APP_VERSION__}</span>
+        <Dot />
+        <span>Made by Anwar</span>
+        <Dot />
+        <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+          Source on GitHub
+        </a>
+        <Dot />
+        <span>MIT license</span>
+      </footer>
     </div>
   );
 }
+
+const Dot = () => <span aria-hidden="true">·</span>;

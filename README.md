@@ -261,3 +261,8 @@ once per distinct URI while building the index). Numbers vary by machine; the te
 - The numeric range sliders are linear, which is coarse for heavy-tailed byte counts (use the number inputs).
 - Column order, widths and visibility are per session (reset when a new file is loaded).
 - Clipboard copy needs a secure context (https or localhost); a `document.execCommand` fallback is used otherwise.
+
+## License
+
+MIT © 2026 Anwar — see [LICENSE](LICENSE). The bundled libraries (React, Zustand, TanStack Virtual) are MIT
+licensed too; their notices are kept in the built JavaScript.

@@ -329,6 +329,22 @@ input[type='checkbox'] {
   margin: 0;
   font-size: 12.5px;
 }
+.home-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.home-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.home-footer a:hover {
+  text-decoration: underline;
+}
 .home-tips kbd {
   padding: 0 5px;
   border: 1px solid var(--border-strong);
