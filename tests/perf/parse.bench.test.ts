@@ -1,10 +1,11 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { generateIisLog } from '../../scripts/gen-iis';
-import { evaluateFilters } from '../../src/filters/applyFilters';
+import { BIT_ENDPOINT, evaluateFilters } from '../../src/filters/applyFilters';
 import { buildLogIndex } from '../../src/filters/logIndex';
 import { EMPTY_FILTERS } from '../../src/filters/types';
 import { parseText } from '../../src/parser';
+import { computeEndpoints } from '../../src/utils/endpoints';
 import { computeInsights } from '../../src/utils/insights';
 import { sortIndices } from '../../src/utils/sort';
 import { streamParseSources, type StreamBatch } from '../../src/worker/streamParse';
@@ -52,6 +53,11 @@ describe(`performance (${LINES.toLocaleString()} IIS lines)`, () => {
       evaluateFilters(parsed.rows, index, { ...EMPTY_FILTERS, search: 'products/\\d+', regex: true }, opts),
     );
     time('insights (all rows)', () => computeInsights(parsed.rows, parsed.schema, index, Uint32Array.from(parsed.rows.keys())));
+    const noFilter = evaluateFilters(parsed.rows, index, EMPTY_FILTERS, opts);
+    const { result: endpoints } = time('endpoints (all rows)', () =>
+      computeEndpoints(parsed.rows, index, noFilter.mask, BIT_ENDPOINT, 'cs-method'),
+    );
+    expect(endpoints.length).toBeGreaterThan(0);
     expect(ev.matched.length).toBeGreaterThan(0);
     const all = Uint32Array.from(parsed.rows.keys());
     const col = (k: string) => parsed.schema.find((c) => c.key === k)!;

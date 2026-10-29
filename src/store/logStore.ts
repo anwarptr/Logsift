@@ -9,7 +9,7 @@ import { loadPrefs, savePrefs, type Density, type ThemePref, type TimeDisplay } 
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type SortDir = 'asc' | 'desc';
-export type ViewTab = 'rows' | 'malformed';
+export type ViewTab = 'rows' | 'endpoints' | 'malformed';
 
 export interface FileMeta {
   name: string;

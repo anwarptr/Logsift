@@ -19,6 +19,8 @@ export interface FilterState {
   ranges: Record<string, Range>;
   uriMode: UriMode;
   uri: string;
+  /** URI pattern from the Endpoints view (see uriPattern); '' = off. */
+  endpoint: string;
   hideHealthChecks: boolean;
   hideScm: boolean;
   onlyErrors: boolean;
@@ -35,6 +37,7 @@ export const EMPTY_FILTERS: FilterState = {
   ranges: {},
   uriMode: 'contains',
   uri: '',
+  endpoint: '',
   hideHealthChecks: false,
   hideScm: false,
   onlyErrors: false,

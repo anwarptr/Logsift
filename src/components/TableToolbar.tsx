@@ -14,6 +14,7 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
   const slowMs = useLogStore((s) => s.slowThresholdMs);
   const setSlow = useLogStore((s) => s.setSlowThreshold);
   const hasDuration = useLogStore((s) => s.schema.some((c) => c.role === 'duration'));
+  const hasUri = useLogStore((s) => s.schema.some((c) => c.role === 'uri'));
 
   return (
     <div className="table-toolbar">
@@ -29,6 +30,19 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
         >
           Rows <span className="count">{formatNumber(rowCount)}</span>
         </button>
+        {hasUri && (
+          <button
+            type="button"
+            role="tab"
+            id="tab-endpoints"
+            aria-selected={tab === 'endpoints'}
+            aria-controls="panel-endpoints"
+            className="tab"
+            onClick={() => setTab('endpoints')}
+          >
+            Endpoints
+          </button>
+        )}
         <button
           type="button"
           role="tab"

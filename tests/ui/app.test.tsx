@@ -141,6 +141,36 @@ describe('several files', () => {
   });
 });
 
+describe('endpoints view', () => {
+  it('groups requests by URI pattern and filters to one on click', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const log = [
+      '#Fields: date time cs-method cs-uri-stem sc-status time-taken',
+      '2026-10-27 10:00:00 GET /api/products/1 200 10',
+      '2026-10-27 10:00:01 GET /api/products/2 500 30',
+      '2026-10-27 10:00:02 GET /health 200 1',
+    ].join('\n');
+    act(() => useLogStore.getState().loadText(log));
+    await waitFor(() => expect(rowCount()).toBe('3 of 3 rows'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Endpoints' }));
+    const table = screen.getByRole('table', { name: 'Endpoints' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows.map((r) => r.textContent)).toEqual([
+      // requests 2, errors 1, 50%, avg 20, p50 20, p95 29, max 30
+      '/api/products/{id}GET2150%20202930',
+      '/healthGET100%1111',
+    ]);
+
+    fireEvent.click(within(table).getByRole('button', { name: '/api/products/{id}' }));
+    expect(screen.getByRole('tab', { name: /Rows/ }).getAttribute('aria-selected')).toBe('true');
+    expect(rowCount()).toBe('2 of 3 rows');
+    expect(screen.getByRole('button', { name: 'Remove filter Endpoint: /api/products/{id}' })).toBeTruthy();
+    act(() => useLogStore.getState().clearFilters());
+  });
+});
+
 describe('time zone', () => {
   it('shows the detected zone and switches between log and local time', async () => {
     await loadSample();

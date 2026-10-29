@@ -472,3 +472,95 @@ mark {
   background: var(--accent-soft);
   text-decoration: none;
 }
+
+/* Endpoints view */
+.endpoints {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.endpoints-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.endpoints-head .facet-search {
+  width: min(280px, 100%);
+  margin: 0;
+}
+.endpoints-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.endpoints-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.endpoints-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.endpoints-table th.num,
+.endpoints-table td.num {
+  text-align: right;
+}
+.th-button {
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.endpoints-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.endpoints-table tbody tr:hover {
+  background: var(--row-hover);
+}
+.endpoints-table tr.selected {
+  background: var(--row-selected);
+}
+.endpoint-cell {
+  max-width: 0;
+  width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
+.endpoint-methods {
+  margin-left: 8px;
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.endpoints-more {
+  padding: 8px 12px;
+}

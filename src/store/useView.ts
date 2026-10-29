@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
+import { BIT_ENDPOINT, compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
 import { buildLogIndex, type LogIndex } from '../filters/logIndex';
 import type { FilterState } from '../filters/types';
 import type { ColumnDef, LogRow, LogTimeZone } from '../parser';
+import { computeEndpoints, type EndpointStat } from '../utils/endpoints';
 import { computeInsights, type Insights } from '../utils/insights';
 import { sortIndices } from '../utils/sort';
 import { logDisplayZone, type DisplayZone } from '../utils/timezone';
@@ -114,4 +115,19 @@ export function useDisplayZone(): DisplayZone {
   const tz = useLogStore((s) => s.logTimeZone);
   const display = useLogStore((s) => s.timeDisplay);
   return getZone(display, tz);
+}
+
+const getEndpoints = memoLast((rows: LogRow[], index: LogIndex, mask: Uint32Array, methodKey: string | undefined) =>
+  computeEndpoints(rows, index, mask, BIT_ENDPOINT, methodKey),
+);
+
+/** Per-endpoint stats over the filtered rows, ignoring the endpoint filter itself; null while loading. */
+export function useEndpoints(): EndpointStat[] | null {
+  const rows = useLogStore((s) => s.rows);
+  const schema = useLogStore((s) => s.schema);
+  const index = useLogIndex();
+  const ev = useFilterEval();
+  const methodKey = schema.find((c) => c.role === 'method')?.key;
+  if (!index?.uriPattern || !ev) return null;
+  return getEndpoints(rows, index, ev.mask, methodKey);
 }

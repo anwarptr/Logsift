@@ -19,6 +19,7 @@ describe('urlState', () => {
       ranges: { 'time-taken': [100, null], 'sc-bytes': [null, 5000] },
       uriMode: 'startsWith',
       uri: '/api',
+      endpoint: '/api/products/{id}',
       hideHealthChecks: true,
       hideScm: true,
       onlyErrors: true,

@@ -89,6 +89,12 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   (↑/↓ buttons for keyboard users), status colours (2xx green, 3xx blue, 4xx amber, 5xx red), level colours,
   slow-row highlight (threshold editable, default 1000 ms), compact/comfortable density, search-match highlighting.
   Click a row (or arrow keys + Enter) to open the detail panel with all fields, **Copy as JSON** and **Copy raw line**.
+- **Endpoints** tab: requests grouped by URI pattern — lower-cased, trailing `/` dropped, and variable segments
+  replaced (numbers → `{id}`, GUIDs → `{guid}`, dates → `{date}`, long hex → `{hash}`, long opaque tokens →
+  `{token}`), so `/api/Products/123` and `/api/products/456/` are both `/api/products/{id}`. Per endpoint: methods,
+  requests, errors, error %, and avg/p50/p95/max duration, over the current filters; sortable by any column and
+  searchable. Click an endpoint to filter the rows to it (an **Endpoint** chip; the list itself keeps showing every
+  endpoint, like facet counts).
 - **Insights** (collapsible, always reflects the filtered rows): total, error rate, avg/p95/max duration, bytes sent;
   requests-over-time histogram with automatic bucket size, errors stacked in red, hover tooltip, and
   click/drag to set the time filter; status (or level) distribution, top 10 URIs, top 10 client IPs (click any
@@ -115,6 +121,7 @@ All filters are generated from the detected schema and the data (not hard-coded 
 | Status classes | 2xx / 3xx / 4xx / 5xx chips with counts. |
 | Numeric ranges | Dual sliders + number inputs for duration/bytes columns (`time-taken`, `sc-bytes`, `cs-bytes`) and any other high-cardinality numeric column. Bounds come from the data. |
 | URI | `contains` / `starts with` / `equals` (case-insensitive) on `cs-uri-stem` (or the format's equivalent), plus a top-10 frequent paths list. |
+| Endpoint | One URI pattern, set from the Endpoints tab (see above). |
 | Quick toggles | Hide health checks, Hide SCM/Kudu, Only errors (status ≥ 400, or ERROR/FATAL level for text/JSON logs), Only slow (duration > threshold). Shown only when the columns exist. |
 
 Active filters appear as removable chips with **Clear all** and an "X of Y rows" count. The full filter state is
@@ -162,7 +169,8 @@ table, sidebar and insights share one computation.
 **Measured** (`npm run test:perf`, 500,000 synthetic IIS lines / 85 MB, Node 24 on a dev laptop):
 parse ≈ 1.0–1.3 s (target < 5 s), build index ≈ 0.5 s, combined filter ≈ 60 ms, regex search ≈ 30–50 ms,
 insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap after parsing; the streaming (worker)
-path ≈ 1.2 s plain and ≈ 1.0 s from a 19 MB `.gz`. Numbers vary by machine; the test fails only above 10 s.
+path ≈ 1.2 s plain and ≈ 1.0 s from a 19 MB `.gz`; endpoint stats over all rows ≈ 60 ms (URI patterns are computed
+once per distinct URI while building the index). Numbers vary by machine; the test fails only above 10 s.
 
 ## Design decisions
 

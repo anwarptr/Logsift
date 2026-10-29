@@ -11,6 +11,8 @@ import type { FilterState } from './types';
 export const BIT_OTHER = 1;
 export const BIT_STATUS = 2;
 export const BIT_URI = 4;
+/** Above the facet bits (shift 3, at most 24 facets → bits 3..26). */
+export const BIT_ENDPOINT = 1 << 30;
 const FACET_BIT_SHIFT = 3;
 
 export interface CompiledSearch {
@@ -135,6 +137,13 @@ export function evaluateFilters(
       }
       if (!ok) mask[i]! |= BIT_URI;
     }
+  }
+
+  // Endpoint (URI pattern), with its own bit so the Endpoints view can list every endpoint while one is selected.
+  if (f.endpoint && index.uriPattern) {
+    const code = index.uriPattern.values.indexOf(f.endpoint);
+    const codes = index.uriPattern.codes;
+    for (let i = 0; i < n; i++) if (codes[i] !== code) mask[i]! |= BIT_ENDPOINT;
   }
 
   // Quick toggles.

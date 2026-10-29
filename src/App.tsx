@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DropZone, ParseProgress } from './components/DropZone';
+import { EndpointsTable } from './components/EndpointsTable';
 import { FileInfo } from './components/FileInfo';
 import { FilterChips } from './components/FilterChips';
 import { FilterSidebar } from './components/FilterSidebar';
@@ -106,6 +107,10 @@ export default function App() {
               {tab === 'rows' ? (
                 <div role="tabpanel" id="panel-rows" aria-labelledby="tab-rows" className="tab-panel">
                   <LogTable rows={rows} indices={indices} columns={columns} highlight={highlight} />
+                </div>
+              ) : tab === 'endpoints' ? (
+                <div role="tabpanel" id="panel-endpoints" aria-labelledby="tab-endpoints" className="tab-panel">
+                  <EndpointsTable />
                 </div>
               ) : (
                 <div role="tabpanel" id="panel-malformed" aria-labelledby="tab-malformed" className="tab-panel">

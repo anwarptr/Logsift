@@ -11,6 +11,7 @@ interface Wire {
   r?: Record<string, [number | null, number | null]>;
   um?: UriMode;
   u?: string;
+  ep?: string;
   hh?: 1;
   hs?: 1;
   oe?: 1;
@@ -34,6 +35,7 @@ export function serializeFilters(f: FilterState): string {
     w.u = f.uri;
     if (f.uriMode !== 'contains') w.um = f.uriMode;
   }
+  if (f.endpoint) w.ep = f.endpoint;
   if (f.hideHealthChecks) w.hh = 1;
   if (f.hideScm) w.hs = 1;
   if (f.onlyErrors) w.oe = 1;
@@ -78,6 +80,7 @@ export function parseFilters(hash: string): FilterState {
     }
   }
   if (isStr(w.u)) out.uri = w.u;
+  if (isStr(w.ep)) out.endpoint = w.ep;
   if (w.um === 'startsWith' || w.um === 'equals' || w.um === 'contains') out.uriMode = w.um;
   out.hideHealthChecks = w.hh === 1;
   out.hideScm = w.hs === 1;

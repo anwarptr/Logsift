@@ -1,4 +1,5 @@
 import type { ColumnDef, ColumnRole, LogRow } from '../parser';
+import { uriPattern } from '../utils/uriPattern';
 import { facetKey, NULL_KEY } from './types';
 
 /** A column is a facet if it has fewer than this many distinct values. */
@@ -55,6 +56,8 @@ export interface LogIndex {
   durationKey: string | null;
   uri: (string | null)[] | null;
   uriKey: string | null;
+  /** URI pattern per row (see uriPattern), dictionary-coded; NULL_KEY for rows without a URI. */
+  uriPattern: { codes: Uint32Array; values: string[] } | null;
   /** Bit flags per row: 1 = health check, 2 = SCM, 4 = error level. */
   flags: Uint8Array;
   hasHealthCheck: boolean;
@@ -163,12 +166,32 @@ export function buildLogIndex(rows: readonly LogRow[], schema: ColumnDef[]): Log
   }
 
   let uri: (string | null)[] | null = null;
+  let uriPatternIdx: LogIndex['uriPattern'] = null;
   if (uriCol) {
     uri = new Array<string | null>(n);
+    const codes = new Uint32Array(n);
+    const values: string[] = [];
+    const byPattern = new Map<string, number>();
+    // Distinct URIs are few compared to rows, so normalise each once.
+    const byUri = new Map<string | null, number>();
     for (let i = 0; i < n; i++) {
       const v = rows[i]!.values[uriCol.key];
-      uri[i] = v === null || v === undefined ? null : String(v);
+      const u = v === null || v === undefined ? null : String(v);
+      uri[i] = u;
+      let code = byUri.get(u);
+      if (code === undefined) {
+        const p = u === null ? NULL_KEY : uriPattern(u);
+        code = byPattern.get(p);
+        if (code === undefined) {
+          code = values.length;
+          values.push(p);
+          byPattern.set(p, code);
+        }
+        byUri.set(u, code);
+      }
+      codes[i] = code;
     }
+    uriPatternIdx = { codes, values };
   }
 
   return {
@@ -183,6 +206,7 @@ export function buildLogIndex(rows: readonly LogRow[], schema: ColumnDef[]): Log
     durationKey: durationCol?.key ?? null,
     uri,
     uriKey: uriCol?.key ?? null,
+    uriPattern: uriPatternIdx,
     flags,
     hasHealthCheck: !!healthCol,
     hasScm: !!scmCol,
