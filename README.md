@@ -19,6 +19,22 @@ npm run test:perf    # 500k-line parse benchmark (logs timings)
 npm run gen:iis -- 500000 big.log   # write a synthetic IIS log to try in the UI
 ```
 
+### Windows: double-click launcher
+
+**`LogViewer.cmd`** (in the project folder) starts the app locally and opens it in your browser. Requires Node.js 20+.
+
+- **First run:** installs dependencies (`npm ci`) and builds the app, which takes about a minute.
+- **Later runs:** start in a few seconds. The app is rebuilt automatically when the code changed since the last
+  build (a different git commit, e.g. after `git pull`); run `LogViewer.cmd rebuild` to force a rebuild after
+  local edits.
+- **Already running?** Double-clicking again just opens the browser at http://localhost:4173/.
+- **To stop:** close the console window.
+- **Shortcut:** right-click `LogViewer.cmd` → *Send to* → *Desktop (create shortcut)* for a desktop icon.
+
+It serves the production build (`vite preview`) on localhost only, so other machines can't reach it and logs never
+leave your PC. Opening `dist\index.html` directly from disk does not work, because browsers block the parser's
+worker on `file://` pages; that's why the launcher runs a small local server.
+
 Open the app, then drop one or more `.log`/`.txt` files (or `.gz`/`.zip` archives of them) anywhere on the page,
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).

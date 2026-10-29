@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.log text eol=lf
+# Windows batch files need CRLF line endings to run reliably in cmd.exe
+*.cmd text eol=crlf
