@@ -40,7 +40,7 @@ export default function App() {
     <div className={'app' + (focus ? ' focus-mode' : '')}>
       {/* Hidden by CSS in focus mode rather than unmounted: its DropZone owns the window-wide drop/paste handlers. */}
       <header className="app-header">
-        <h1 className="app-title">Log Viewer</h1>
+        <h1 className="app-title">Logsift</h1>
         <div className="header-actions">
           {hasData && (
             <button

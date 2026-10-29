@@ -1,16 +1,16 @@
 @echo off
-rem Log Viewer launcher: double-click to open the app in your browser.
+rem Logsift launcher: double-click to open the app in your browser.
 rem First run installs dependencies and builds the app; later runs start in seconds.
-rem   LogViewer.cmd           start (rebuilds automatically after a git pull)
-rem   LogViewer.cmd rebuild   force a fresh build (e.g. after editing the code)
+rem   Logsift.cmd           start (rebuilds automatically after a git pull)
+rem   Logsift.cmd rebuild   force a fresh build (e.g. after editing the code)
 setlocal
-title Log Viewer
+title Logsift
 cd /d "%~dp0"
 
 set "PORT=4173"
 set "URL=http://localhost:%PORT%/"
 set "OPEN=--open"
-if defined LOGVIEWER_NO_OPEN set "OPEN="
+if defined LOGSIFT_NO_OPEN set "OPEN="
 
 where node >nul 2>nul
 if errorlevel 1 (
@@ -49,7 +49,7 @@ if defined REV (echo %REV%)>"dist\.build-rev"
 
 :serve
 echo.
-echo   Log Viewer is running at %URL%
+echo   Logsift is running at %URL%
 echo   Your log files are read only in the browser on this PC.
 echo   Close this window to stop it.
 echo.
@@ -58,6 +58,6 @@ exit /b 0
 
 :fail
 echo.
-echo Log Viewer could not start (see the messages above).
+echo Logsift could not start (see the messages above).
 pause
 exit /b 1
