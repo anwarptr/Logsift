@@ -34,11 +34,15 @@ export function splitLines(text: string): string[] {
   return lines;
 }
 
-/** Parse a whole text in one go (used by tests and the benchmark; the worker streams instead). */
-export function parseText(text: string, format?: LogFormat): ParseResult {
+/**
+ * Parse a whole text in one go (used by tests and the benchmark; the worker streams instead).
+ * `defaultDate` dates lines that carry only a time of day (default: today).
+ */
+export function parseText(text: string, format?: LogFormat, defaultDate?: number): ParseResult {
   const lines = splitLines(text);
   const fmt = format ?? detectFormat(lines.slice(0, 200));
   const parser = createParser(fmt);
+  if (defaultDate !== undefined) parser.setDefaultDate?.(defaultDate);
   const rows: LogRow[] = [];
   const malformed: MalformedRow[] = [];
   const meta: string[] = [];

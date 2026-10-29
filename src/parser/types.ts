@@ -89,6 +89,11 @@ export interface LineParser {
   schema(): ColumnDef[];
   /** Time zone the timestamps were written in, as far as the lines seen so far tell. */
   timeZone(): LogTimeZone;
+  /**
+   * Date to use for lines that carry only a time of day (e.g. the file's modified time).
+   * Called before each file; parsers whose lines always have a date ignore it.
+   */
+  setDefaultDate?(ms: number): void;
 }
 
 export interface ParseResult {

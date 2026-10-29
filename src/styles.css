@@ -434,6 +434,11 @@ input[type='checkbox'] {
   font-size: 12px;
   font-weight: 400;
 }
+.tag.warn-tag {
+  background: var(--warn-bg);
+  color: var(--warn);
+  cursor: help;
+}
 .tz-switch {
   display: inline-flex;
   gap: 2px;

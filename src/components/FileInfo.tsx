@@ -36,6 +36,14 @@ function TimeZoneInfo({ tz, expanded }: { tz: LogTimeZone; expanded: boolean }) 
       <dt>Time zone</dt>
       <dd className="tz-info">
         <span title={tz.source}>{zoneText(tz)}</span>
+        {tz.assumedDate && (
+          <span
+            className="tag warn-tag"
+            title="The log lines have a time but no date. The date comes from the file's last-modified date (today for pasted text) and moves on a day when the time wraps past midnight."
+          >
+            Date assumed: {tz.assumedDate}
+          </span>
+        )}
         {expanded && tz.kind !== 'mixed' && tz.kind !== 'unspecified' && (
           <span className="muted tz-source">{tz.source}</span>
         )}

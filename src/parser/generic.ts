@@ -1,5 +1,5 @@
 import { TIMESTAMP_COLUMN } from './schema';
-import { OffsetTracker, parseZoneSuffix } from './timezone';
+import { OffsetTracker, parseZoneSuffix, type LogTimeZone } from './timezone';
 import type { CellValue, ColumnDef, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
 
 /**
@@ -11,6 +11,25 @@ import type { CellValue, ColumnDef, LineParser, LogRow, MalformedRow, ParsedChun
  */
 export const GENERIC_LINE_RE =
   /^\s*\[?(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d{1,9})?(?: ?(?:Z|[+-]\d{2}:?\d{2}))?)\]?[\s|:-]*(?:\[?(TRACE|DEBUG|INFORMATION|INFO|WARNING|WARN|ERROR|ERR|FATAL|CRITICAL|CRIT|VERBOSE|VRB|DBG|INF|WRN|ERR|FTL)\]?(?![A-Za-z]))?[\s|:-]*(?:\[([^\]]{1,120})\])?[\s:-]*(.*)$/i;
+
+/**
+ * Time of day without a date, then a level (required, so ordinary text starting with a time
+ * isn't taken for an entry). Serilog's console default is "[HH:mm:ss INF] message":
+ *   [11:54:02 INF] Now listening on: http://localhost:5100
+ *   11:54:02.120 WARN [Db] Pool nearly exhausted
+ */
+export const TIME_ONLY_LINE_RE =
+  /^\s*\[?(\d{1,2}):(\d{2}):(\d{2})(?:[.,](\d{1,9}))?[\s|:-]+\[?(TRACE|DEBUG|INFORMATION|INFO|WARNING|WARN|ERROR|ERR|FATAL|CRITICAL|CRIT|VERBOSE|VRB|DBG|INF|WRN|FTL)\]?(?![A-Za-z])[\s|:-]*(?:\[([^\]]{1,120})\])?[\s:-]*(.*)$/i;
+
+const DAY_MS = 86_400_000;
+
+/** Midnight of `ms`'s local calendar date, as a zone-less (UTC) timestamp like the parsed times. */
+export function calendarDay(ms: number): number {
+  const d = new Date(ms);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+const isoDate = (day: number) => new Date(day).toISOString().slice(0, 10);
 
 const LEVEL_ALIASES: Record<string, string> = {
   INFORMATION: 'INFO',
@@ -73,19 +92,42 @@ export function createGenericParser(): LineParser {
   let sawLogger = false;
   let sawRequest = false;
   const zones = new OffsetTracker();
+  // Time-only lines: the date comes from outside (file modified date), and moves on a day
+  // whenever the clock jumps back more than an hour (past midnight).
+  let day = calendarDay(Date.now());
+  let lastTimeOfDay = -1;
+  const assumedDays = new Set<number>();
+
+  function setDefaultDate(ms: number): void {
+    day = calendarDay(ms);
+    lastTimeOfDay = -1;
+  }
+
+  /** [timestamp text or epoch ms, zone offset, level, logger, message] for an entry line, else null. */
+  function matchEntry(line: string): [number | null, number | null, string | undefined, string | undefined, string] | null {
+    const m = GENERIC_LINE_RE.exec(line);
+    if (m) return [parseLooseIso(m[1]!), parseZoneSuffix(m[1]!), m[2], m[3], m[4] ?? ''];
+    const t = TIME_ONLY_LINE_RE.exec(line);
+    if (!t || +t[1]! > 23 || +t[2]! > 59 || +t[3]! > 59) return null;
+    const ms = t[4] ? Math.floor(+`0.${t[4]}` * 1000) : 0;
+    const timeOfDay = ((+t[1]! * 60 + +t[2]!) * 60 + +t[3]!) * 1000 + ms;
+    if (lastTimeOfDay >= 0 && timeOfDay < lastTimeOfDay - 3_600_000) day += DAY_MS;
+    lastTimeOfDay = timeOfDay;
+    assumedDays.add(day);
+    return [day + timeOfDay, null, t[5], t[6], t[7] ?? ''];
+  }
 
   function pushLine(line: string, lineNo: number): void {
     if (line.trim().length === 0) return;
-    const m = GENERIC_LINE_RE.exec(line);
+    const m = matchEntry(line);
     if (m) {
       if (pending) rows.push(pending);
-      const ts = parseLooseIso(m[1]!);
-      zones.observe(parseZoneSuffix(m[1]!));
-      const level = m[2] ? normalizeLevel(m[2]) : null;
-      const logger = m[3] ?? null;
+      const [ts, zone, rawLevel, rawLogger, message] = m;
+      zones.observe(zone);
+      const level = rawLevel ? normalizeLevel(rawLevel) : null;
+      const logger = rawLogger ?? null;
       if (level) sawLevel = true;
       if (logger) sawLogger = true;
-      const message = m[4] ?? '';
       const values: Record<string, CellValue> = { timestamp: ts, level, logger, message };
       const req = SERILOG_REQUEST_RE.exec(message);
       if (req) {
@@ -131,5 +173,13 @@ export function createGenericParser(): LineParser {
     return cols;
   }
 
-  return { format: 'generic', pushLine, drain, finish, schema, timeZone: () => zones.result() };
+  function timeZone(): LogTimeZone {
+    const tz = zones.result();
+    if (assumedDays.size === 0) return tz;
+    const days = [...assumedDays].sort((a, b) => a - b);
+    const range = days.length === 1 ? isoDate(days[0]!) : `${isoDate(days[0]!)} – ${isoDate(days[days.length - 1]!)}`;
+    return { ...tz, assumedDate: range };
+  }
+
+  return { format: 'generic', pushLine, drain, finish, schema, timeZone, setDefaultDate };
 }

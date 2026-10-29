@@ -161,3 +161,18 @@ describe('mergeByTime', () => {
     expect(merged.map((r) => r.id)).toEqual([0, 1, 2, 3, 4]);
   });
 });
+
+describe('time-only logs', () => {
+  it("dates each file's lines from its modified time", async () => {
+    const day = (d: number) => new Date(2026, 9, d, 18, 0).getTime();
+    const a = new File(['[09:00:00 INF] first\n[09:00:05 INF] second\n'], 'app-a.log', { lastModified: day(27) });
+    const b = new File(['[08:00:00 INF] next day\n'], 'app-b.log', { lastModified: day(28) });
+    const { summary, rows } = await run([a, b].map((f) => ({ name: f.name, blob: f })));
+    expect(rows.map((r) => r.ts)).toEqual([
+      Date.UTC(2026, 9, 27, 9, 0, 0),
+      Date.UTC(2026, 9, 27, 9, 0, 5),
+      Date.UTC(2026, 9, 28, 8, 0, 0),
+    ]);
+    expect(summary.timeZone.assumedDate).toBe('2026-10-27 – 2026-10-28');
+  });
+});

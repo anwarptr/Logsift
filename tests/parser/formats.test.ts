@@ -159,3 +159,52 @@ describe('Serilog text logs', () => {
   });
 });
 
+describe('time-only lines (Serilog console: "[HH:mm:ss INF] message")', () => {
+  // Indented, as when copied from a terminal.
+  const LOG = [
+    '  [11:54:02 INF] Now listening on: http://localhost:5100',
+    '  [11:54:02 INF] Application started. Press Ctrl+C to shut down.',
+    '  [11:54:03 INF] HTTP GET /swagger responded 301 in 6.1034 ms',
+    '  [11:55:14 INF] HTTP GET /api/app/version responded 200 in 7866.6915 ms',
+    '  [11:55:15 ERR] HTTP GET /api/x responded 500 in 12.5 ms',
+    'System.InvalidOperationException: boom',
+    '   at X.Y()',
+  ].join('\n');
+  const FILE_DATE = new Date(2026, 9, 29, 18, 0).getTime(); // local 29 Oct 2026, 18:00
+
+  it('takes the date from the given default date and reads the rest like any text log', () => {
+    const r = parseText(LOG, undefined, FILE_DATE);
+    expect(r.format).toBe('generic');
+    expect(r.rows).toHaveLength(5);
+    expect(r.malformed).toHaveLength(0);
+    expect(r.rows[0]!.ts).toBe(Date.UTC(2026, 9, 29, 11, 54, 2));
+    expect(r.rows[3]!.values).toMatchObject({ level: 'INFO', RequestPath: '/api/app/version', StatusCode: 200, Elapsed: 7866.6915 });
+    expect(String(r.rows[4]!.values.message)).toContain('at X.Y()');
+    expect(r.timeZone).toMatchObject({ kind: 'unspecified', assumedDate: '2026-10-29' });
+  });
+
+  it('moves to the next day when the time wraps past midnight', () => {
+    const r = parseText(
+      ['[23:59:58 INF] a', '[23:59:59.500 WRN] b', '[00:00:01 INF] c', '[00:00:00 INF] slightly out of order'].join('\n'),
+      'generic',
+      FILE_DATE,
+    );
+    expect(r.rows.map((x) => x.ts)).toEqual([
+      Date.UTC(2026, 9, 29, 23, 59, 58),
+      Date.UTC(2026, 9, 29, 23, 59, 59, 500),
+      Date.UTC(2026, 9, 30, 0, 0, 1),
+      Date.UTC(2026, 9, 30, 0, 0, 0),
+    ]);
+    expect(r.timeZone.assumedDate).toBe('2026-10-29 – 2026-10-30');
+  });
+
+  it('needs a level, so text that merely starts with a time is not an entry', () => {
+    const r = parseText('[10:00:00 INF] start\n12:30 lunch break notes', 'generic', FILE_DATE);
+    expect(r.rows).toHaveLength(1);
+    expect(String(r.rows[0]!.values.message)).toContain('lunch break');
+  });
+
+  it('dated logs report no assumed date', () => {
+    expect(parseText(read('sample-serilog.log')).timeZone.assumedDate).toBeUndefined();
+  });
+});

@@ -71,6 +71,8 @@ interface Chunk {
 
 interface Input {
   name: string;
+  /** Modified time of the file (or the archive it came from); dates time-only log lines. */
+  modified: number;
   chunks(): AsyncGenerator<Chunk>;
 }
 
@@ -120,6 +122,8 @@ async function* decompressChunks(name: string, compressed: Blob, format: Compres
 async function expandSources(sources: LogSource[], chunkBytes: number): Promise<Input[]> {
   const inputs: Input[] = [];
   for (const s of [...sources].sort((a, b) => compareNames(a.name, b.name))) {
+    // Files have a modified time; pasted text (a plain Blob) is dated now.
+    const modified = (s.blob as Partial<File>).lastModified ?? Date.now();
     if (isZipName(s.name)) {
       let entries;
       try {
@@ -135,14 +139,15 @@ async function expandSources(sources: LogSource[], chunkBytes: number): Promise<
         });
         inputs.push({
           name: entry.name,
+          modified,
           chunks: () =>
             entry.method === 8 ? decompressChunks(entry.name, data, 'deflate-raw') : sliceChunks(data, chunkBytes),
         });
       }
     } else if (GZIP_RE.test(s.name)) {
-      inputs.push({ name: s.name.replace(GZIP_RE, ''), chunks: () => decompressChunks(s.name, s.blob, 'gzip') });
+      inputs.push({ name: s.name.replace(GZIP_RE, ''), modified, chunks: () => decompressChunks(s.name, s.blob, 'gzip') });
     } else {
-      inputs.push({ name: s.name, chunks: () => sliceChunks(s.blob, chunkBytes) });
+      inputs.push({ name: s.name, modified, chunks: () => sliceChunks(s.blob, chunkBytes) });
     }
   }
   return inputs;
@@ -205,6 +210,8 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
 
   for (const input of inputs) {
     current = input.name;
+    // Later files reuse the parser (created on the first lines); tell it this file's date.
+    (parser as LineParser | null)?.setDefaultDate?.(input.modified);
     const decoder = new TextDecoder('utf-8');
     let carry = '';
     let started = false;
@@ -230,6 +237,7 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
         detected = detectFormat(ls.slice(0, 200));
         format = opts.format ?? detected;
         parser = createParser(format);
+        parser.setDefaultDate?.(input.modified);
         opts.onStart?.(format, detected, files);
       }
       for (let i = 0; i < ls.length; i++) {

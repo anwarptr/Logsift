@@ -7,6 +7,11 @@ export interface LogTimeZone {
   offsetMin: number;
   /** Short explanation shown next to the zone, e.g. "IIS logs are always UTC". */
   source: string;
+  /**
+   * Set when lines had a time but no date: the date(s) assumed for them ("2026-10-29", or a
+   * range across midnight), taken from the file's modified date or, for pasted text, today.
+   */
+  assumedDate?: string;
 }
 
 export const IIS_TIME_ZONE: LogTimeZone = { kind: 'utc', offsetMin: 0, source: 'IIS logs are always UTC' };
