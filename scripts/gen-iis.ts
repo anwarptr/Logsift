@@ -43,7 +43,7 @@ export function generateIisLog(lines: number, seed = 42): string {
     const time = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
     const scm = rnd() < 0.05;
     const ua = pick(UAS);
-    const ip = ua === 'AlwaysOn' && rnd() < 0.5 ? '127.0.0.1' : `10.140.${Math.floor(rnd() * 4)}.${Math.floor(rnd() * 60)}`;
+    const ip = ua === 'AlwaysOn' && rnd() < 0.5 ? '127.0.0.1' : `10.20.${Math.floor(rnd() * 4)}.${Math.floor(rnd() * 60)}`;
     const query = scm ? '-' : `X-ARR-LOG-ID=${hex(rnd, 8)}-${hex(rnd, 4)}-${hex(rnd, 4)}-${hex(rnd, 4)}-${hex(rnd, 12)}`;
     const slow = rnd() < 0.02;
     out.push(

@@ -74,7 +74,7 @@ describe('insights + export on the sample', () => {
     expect(csvEscape(null)).toBe('');
     const cols = schema.filter((c) => ['timestamp', 'c-ip', 'sc-status'].includes(c.key));
     const csv = toCsvParts(rows, [0, 1], cols).join('');
-    expect(csv).toBe('timestamp,c-ip,sc-status\r\n2026-10-27T04:42:02.000Z,10.20.0.11,404\r\n2026-10-27T04:42:04.000Z,10.20.0.12,404\r\n');
+    expect(csv).toBe('timestamp,c-ip,sc-status\r\n2026-03-14T09:12:02.000Z,10.20.0.11,404\r\n2026-03-14T09:12:04.000Z,10.20.0.12,404\r\n');
     const json = JSON.parse(toJsonParts(rows, [4], schema).join('')) as Record<string, unknown>[];
     expect(json[0]).toMatchObject({ lineNo: 7, 's-sitename': 'DEMO-API-PROD', isScm: true, 'cs-uri-query': null });
   });

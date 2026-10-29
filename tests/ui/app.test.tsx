@@ -110,7 +110,7 @@ describe('App with the sample IIS log', () => {
   it('facet selection and insights reflect the filter', async () => {
     await loadSample();
     const ips = screen.getByRole('list', { name: 'c-ip values' });
-    fireEvent.click(within(ips).getByRole('checkbox', { name: /10\.0\.32\.5/ }));
+    fireEvent.click(within(ips).getByRole('checkbox', { name: /10\.30\.0\.5/ }));
     expect(rowCount()).toBe('3 of 16 rows');
     const insights = screen.getByLabelText('Insights for the filtered rows');
     expect(insights.textContent).toContain('Total requests3');
@@ -178,7 +178,7 @@ describe('time zone', () => {
     expect(info.textContent).toContain('IIS logs are always UTC');
     const sidebar = screen.getByLabelText('Filters');
     expect(sidebar.textContent).toContain('Time range (UTC)');
-    expect(sidebar.textContent).toContain('File spans 2026-10-27 04:42:02 – 2026-10-27 04:43:32');
+    expect(sidebar.textContent).toContain('File spans 2026-03-14 09:12:02 – 2026-03-14 09:13:32');
 
     // Tests run in Asia/Dubai (UTC+4), which differs from the log's UTC.
     const group = within(info).getByRole('radiogroup', { name: 'Show times in' });
@@ -186,10 +186,10 @@ describe('time zone', () => {
     fireEvent.click(localBtn);
     expect(localBtn.getAttribute('aria-checked')).toBe('true');
     expect(sidebar.textContent).toContain('Time range (local, UTC+04:00)');
-    expect(sidebar.textContent).toContain('File spans 2026-10-27 08:42:02 – 2026-10-27 08:43:32');
+    expect(sidebar.textContent).toContain('File spans 2026-03-14 13:12:02 – 2026-03-14 13:13:32');
 
     fireEvent.click(within(group).getByRole('radio', { name: 'Log time (UTC)' }));
-    expect(sidebar.textContent).toContain('File spans 2026-10-27 04:42:02');
+    expect(sidebar.textContent).toContain('File spans 2026-03-14 09:12:02');
   });
 });
 
@@ -197,7 +197,7 @@ describe('IP details', () => {
   it('labels private addresses and offers no look-up for them', async () => {
     await loadSample();
     const { useLogStore } = await import('../../src/store/logStore');
-    const row = useLogStore.getState().rows.find((r) => r.values['c-ip'] === '10.20.0.5')!;
+    const row = useLogStore.getState().rows.find((r) => r.values['c-ip'] === '10.30.0.5')!;
     act(() => useLogStore.getState().select(row.id));
     const details = screen.getByRole('complementary', { name: `Details for line ${row.lineNo}` });
     expect(details.textContent).toContain('Private network');

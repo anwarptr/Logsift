@@ -31,9 +31,9 @@ describe('IIS parser', () => {
 
   it('combines date and time into a UTC timestamp', () => {
     const r = result.rows[0]!;
-    expect(r.ts).toBe(Date.UTC(2026, 9, 27, 4, 42, 2));
+    expect(r.ts).toBe(Date.UTC(2026, 2, 14, 9, 12, 2));
     expect(r.values.timestamp).toBe(r.ts);
-    expect(new Date(r.ts!).toISOString()).toBe('2026-10-27T04:42:02.000Z');
+    expect(new Date(r.ts!).toISOString()).toBe('2026-03-14T09:12:02.000Z');
   });
 
   it('turns "-" into null', () => {
@@ -64,7 +64,7 @@ describe('IIS parser', () => {
   });
 
   it('extracts X-ARR-LOG-ID into arrLogId', () => {
-    expect(result.rows[0]!.values.arrLogId).toBe('bb3dad07-c9ba-4530-a480-3d5a3fb88889');
+    expect(result.rows[0]!.values.arrLogId).toBe('95d6c588-90a6-4936-b1b2-2b81d97b67aa');
     expect(result.rows[4]!.values.arrLogId).toBeNull();
   });
 
@@ -72,7 +72,7 @@ describe('IIS parser', () => {
     const hc = result.rows.filter((r) => r.values.isHealthCheck);
     expect(hc).toHaveLength(6);
     expect(result.rows[3]!.values.isHealthCheck).toBe(true); // 127.0.0.1 + AlwaysOn
-    expect(result.rows[4]!.values.isHealthCheck).toBe(true); // AlwaysOn from 10.20.0.5
+    expect(result.rows[4]!.values.isHealthCheck).toBe(true); // AlwaysOn from 10.30.0.5
     expect(result.rows[0]!.values.isHealthCheck).toBe(false);
 
     const ipOnly = parseText(`${HEADER}\n2026-10-27 04:42:02 SITE GET / - 80 - 127.0.0.1 curl - - h 200 0 0 1 1 1`);

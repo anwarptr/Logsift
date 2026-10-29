@@ -12,7 +12,7 @@ const opts = { slowThresholdMs: 1000 };
 
 const run = (patch: Partial<FilterState>, o = opts) => applyFilters(rows, index, { ...EMPTY_FILTERS, ...patch }, o);
 const count = (patch: Partial<FilterState>, o = opts) => run(patch, o).length;
-const ts = (hms: string) => Date.parse(`2026-10-27T${hms}Z`);
+const ts = (hms: string) => Date.parse(`2026-03-14T${hms}Z`);
 
 describe('buildLogIndex', () => {
   it('picks low-cardinality columns as facets and numeric columns as ranges', () => {
@@ -25,8 +25,8 @@ describe('buildLogIndex', () => {
     expect(index.ranges.map((r) => r.key)).toEqual(expect.arrayContaining(['time-taken', 'sc-bytes', 'cs-bytes']));
     const tt = index.ranges.find((r) => r.key === 'time-taken')!;
     expect([tt.min, tt.max]).toEqual([2, 4414]);
-    expect(index.minTs).toBe(ts('04:42:02'));
-    expect(index.maxTs).toBe(ts('04:43:32'));
+    expect(index.minTs).toBe(ts('09:12:02'));
+    expect(index.maxTs).toBe(ts('09:13:32'));
   });
 });
 
@@ -42,12 +42,12 @@ describe('applyFilters: individual filters', () => {
   });
 
   it('plain search escapes regex characters', () => {
-    expect(count({ search: '10.140.1.1.' })).toBe(0);
+    expect(count({ search: '10.20.0.1.' })).toBe(0);
     expect(count({ search: '(' })).toBe(0);
   });
 
   it('regex search', () => {
-    expect(count({ search: '^2026-10-27 04:43', regex: true })).toBe(8);
+    expect(count({ search: '^2026-03-14 09:13', regex: true })).toBe(8);
     expect(count({ search: '\\s200\\s', regex: true })).toBe(3);
   });
 
@@ -60,14 +60,14 @@ describe('applyFilters: individual filters', () => {
   });
 
   it('time range (inclusive)', () => {
-    expect(count({ timeFrom: ts('04:43:00'), timeTo: ts('04:43:20') })).toBe(5);
-    expect(count({ timeFrom: ts('04:43:22') })).toBe(3);
-    expect(count({ timeTo: ts('04:42:04') })).toBe(2);
+    expect(count({ timeFrom: ts('09:13:00'), timeTo: ts('09:13:20') })).toBe(5);
+    expect(count({ timeFrom: ts('09:13:22') })).toBe(3);
+    expect(count({ timeTo: ts('09:12:04') })).toBe(2);
   });
 
   it('facets (OR within a column)', () => {
-    expect(count({ facets: { 'c-ip': ['10.20.0.5'] } })).toBe(3);
-    expect(count({ facets: { 'c-ip': ['10.20.0.5', '127.0.0.1'] } })).toBe(6);
+    expect(count({ facets: { 'c-ip': ['10.30.0.5'] } })).toBe(3);
+    expect(count({ facets: { 'c-ip': ['10.30.0.5', '127.0.0.1'] } })).toBe(6);
     expect(count({ facets: { 'sc-status': ['200'] } })).toBe(3);
     expect(count({ facets: { 'cs(User-Agent)': [NULL_KEY] } })).toBe(10);
     expect(count({ facets: { 'c-ip': [] } })).toBe(16);
@@ -114,14 +114,14 @@ describe('applyFilters: individual filters', () => {
 describe('applyFilters: combined', () => {
   it('ANDs filters together', () => {
     expect(count({ hideHealthChecks: true, facets: { 'c-ip': ['10.20.0.12'] } })).toBe(6);
-    expect(count({ hideHealthChecks: true, onlyErrors: true, search: '04:43' })).toBe(4);
+    expect(count({ hideHealthChecks: true, onlyErrors: true, search: '09:13' })).toBe(4);
     expect(
       count({
-        facets: { 'c-ip': ['10.20.0.5'] },
+        facets: { 'c-ip': ['10.30.0.5'] },
         statusClasses: ['2xx'],
         ranges: { 'time-taken': [20, null] },
-        timeFrom: ts('04:42:00'),
-        timeTo: ts('04:43:20'),
+        timeFrom: ts('09:12:00'),
+        timeTo: ts('09:13:20'),
       }),
     ).toBe(2);
     expect(count({ hideScm: true, statusClasses: ['2xx'] })).toBe(0);
@@ -135,11 +135,11 @@ describe('applyFilters: combined', () => {
 
 describe('facet counts', () => {
   it('count over rows matching all other filters, ignoring the facet itself', () => {
-    const ev = evaluateFilters(rows, index, { ...EMPTY_FILTERS, facets: { 'c-ip': ['10.20.0.5'] } }, opts);
+    const ev = evaluateFilters(rows, index, { ...EMPTY_FILTERS, facets: { 'c-ip': ['10.30.0.5'] } }, opts);
     expect(ev.matched.length).toBe(3);
     const ipCol = index.facets.find((f) => f.key === 'c-ip')!;
     const ips = Object.fromEntries(facetCounts(ipCol, ev).map((e) => [e.key, e.count]));
-    expect(ips).toEqual({ '10.20.0.12': 6, '10.20.0.11': 4, '127.0.0.1': 3, '10.20.0.5': 3 });
+    expect(ips).toEqual({ '10.20.0.12': 6, '10.20.0.11': 4, '127.0.0.1': 3, '10.30.0.5': 3 });
     const statusCol = index.facets.find((f) => f.key === 'sc-status')!;
     const statuses = Object.fromEntries(facetCounts(statusCol, ev).map((e) => [e.key, e.count]));
     expect(statuses).toEqual({ '200': 3, '404': 0 });
