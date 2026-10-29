@@ -1,4 +1,4 @@
-import { FLAG_ERROR_LEVEL, type LogIndex } from '../filters/logIndex';
+import { isErrorRow, type LogIndex } from '../filters/logIndex';
 import type { LogRow } from '../parser';
 import { percentile } from './stats';
 
@@ -39,14 +39,13 @@ export function computeEndpoints(
   const counts = new Uint32Array(g);
   const errors = new Uint32Array(g);
   const methods: (Map<string, number> | undefined)[] = new Array(g);
-  const status = index.status;
   const dur = index.duration;
 
   for (let i = 0; i < matched.length; i++) {
     const r = matched[i]!;
     const c = pat.codes[r]!;
     counts[c]!++;
-    if (status ? status[r]! >= 400 : index.flags[r]! & FLAG_ERROR_LEVEL) errors[c]!++;
+    if (isErrorRow(index, r)) errors[c]!++;
     if (methodKey) {
       const m = rows[r]!.values[methodKey];
       if (typeof m === 'string') {

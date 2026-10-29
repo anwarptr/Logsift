@@ -1,0 +1,19 @@
+2026-03-14 09:30:01.102 +04:00 [INF] Now listening on: https://localhost:5001
+2026-03-14 09:30:01.118 +04:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-03-14 09:30:05.240 +04:00 [INF] HTTP OPTIONS /api/orders responded 204 in 0.0512 ms
+2026-03-14 09:30:05.388 +04:00 [INF] HTTP GET /api/orders responded 200 in 142.3381 ms
+2026-03-14 09:30:06.012 +04:00 [INF] HTTP GET /api/orders/7d3f1c2a-5b8e-4f6a-9c1d-2e4b6a8c0f13 responded 200 in 64.9020 ms
+2026-03-14 09:30:06.020 +04:00 [INF] HTTP GET /api/orders/0a9e8d7c-6b5a-4f3e-8d2c-1b0a9f8e7d6c responded 200 in 58.1177 ms
+2026-03-14 09:30:07.455 +04:00 [WRN] Product cache miss for "featured"; reloading
+2026-03-14 09:30:11.873 +04:00 [INF] HTTP GET /api/reports/summary responded 200 in 3625.3447 ms
+2026-03-14 09:30:14.310 +04:00 [ERR] HTTP GET /api/suppliers/search responded 500 in 412.7740 ms
+System.InvalidOperationException: Supplier service credentials are not configured.
+   at DemoShop.Infrastructure.Suppliers.SupplierClient.LoginAsync(CancellationToken ct) in /src/DemoShop.Infrastructure/Suppliers/SupplierClient.cs:line 41
+   at DemoShop.Api.Controllers.SuppliersController.Search(String name, CancellationToken ct) in /src/DemoShop.Api/Controllers/SuppliersController.cs:line 22
+2026-03-14 09:30:14.402 +04:00 [ERR] Unhandled exception processing GET /api/suppliers/search
+System.InvalidOperationException: Supplier service credentials are not configured.
+   at DemoShop.Infrastructure.Suppliers.SupplierClient.LoginAsync(CancellationToken ct) in /src/DemoShop.Infrastructure/Suppliers/SupplierClient.cs:line 41
+2026-03-14 09:30:20.008 +04:00 [INF] HTTP POST /api/auth/refresh responded 401 in 0.4664 ms
+2026-03-14 09:30:23.551 +04:00 [INF] User "5e0c2b4a-1d3f-4e6a-8b9c-7a5d3e1f2b0c" (demo.user) logged in
+2026-03-14 09:30:23.553 +04:00 [INF] HTTP POST /api/auth/login responded 200 in 120.5137 ms
+2026-03-14 09:30:24.900 +04:00 [INF] HTTP GET /api/orders responded 200 in 8403.0060 ms

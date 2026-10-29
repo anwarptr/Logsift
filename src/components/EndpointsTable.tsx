@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
+import { ERROR_BASIS_LABELS, errorBasisOf } from '../filters/logIndex';
 import { facetLabel } from '../filters/types';
 import { useLogStore } from '../store/logStore';
-import { useEndpoints } from '../store/useView';
+import { useEndpoints, useLogIndex } from '../store/useView';
 import type { EndpointStat } from '../utils/endpoints';
 import { formatNumber } from '../utils/format';
 
@@ -20,9 +21,9 @@ export function EndpointsTable() {
   const setFilters = useLogStore((s) => s.setFilters);
   const setTab = useLogStore((s) => s.setTab);
   const hasDuration = useLogStore((s) => s.schema.some((c) => c.role === 'duration'));
-  const errorBasis = useLogStore((s) =>
-    s.schema.some((c) => c.role === 'status') ? 'status ≥ 400' : s.schema.some((c) => c.role === 'level') ? 'ERROR/FATAL' : null,
-  );
+  const index = useLogIndex();
+  const basis = index ? errorBasisOf(index) : null;
+  const errorBasis = basis ? (basis === 'level' ? '' : 'status ') + ERROR_BASIS_LABELS[basis] : null;
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'count', dir: -1 });
   const [query, setQuery] = useState('');
 

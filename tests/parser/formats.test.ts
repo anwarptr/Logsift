@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { detectFormat, parseText, splitLines } from '../../src/parser';
 import { parseApacheTimestamp } from '../../src/parser/apache';
+import { buildLogIndex, isErrorRow } from '../../src/filters/logIndex';
 import { parseLooseIso } from '../../src/parser/generic';
 
 const read = (name: string) => readFileSync(`fixtures/${name}`, 'utf8');
@@ -106,3 +107,55 @@ describe('generic parser', () => {
     expect(parseLooseIso('2026-10-27 04:42:02 +0400')).toBe(Date.UTC(2026, 9, 27, 0, 42, 2));
   });
 });
+
+describe('Serilog text logs', () => {
+  const r = parseText(read('sample-serilog.log'));
+
+  it('is read by the generic parser, with stack traces kept on their entry', () => {
+    expect(r.format).toBe('generic');
+    expect(r.rows).toHaveLength(14);
+    expect(r.malformed).toHaveLength(0);
+    expect(r.timeZone).toMatchObject({ kind: 'offset', offsetMin: 240 });
+    expect(r.rows[0]!.ts).toBe(Date.UTC(2026, 2, 14, 5, 30, 1, 102));
+    const err = r.rows.find((x) => x.values.StatusCode === 500)!;
+    expect(err.values.level).toBe('ERROR');
+    expect(String(err.values.message)).toContain('SupplierClient.cs:line 41');
+  });
+
+  it('turns request log lines into method, path, status and duration columns', () => {
+    expect(r.schema.map((c) => [c.key, c.role])).toEqual([
+      ['timestamp', 'timestamp'],
+      ['level', 'level'],
+      ['RequestMethod', 'method'],
+      ['RequestPath', 'uri'],
+      ['StatusCode', 'status'],
+      ['Elapsed', 'duration'],
+      ['message', 'message'],
+    ]);
+    expect(r.rows[3]!.values).toMatchObject({
+      RequestMethod: 'GET',
+      RequestPath: '/api/orders',
+      StatusCode: 200,
+      Elapsed: 142.3381,
+    });
+    // Application lines keep no request fields.
+    const login = r.rows.find((x) => String(x.values.message).includes('logged in'))!;
+    expect(login.values.StatusCode).toBeUndefined();
+  });
+
+  it('counts failed requests and ERROR lines without a status as errors', () => {
+    const index = buildLogIndex(r.rows, r.schema);
+    const errors = r.rows.filter((_, i) => isErrorRow(index, i)).map((x) => String(x.values.message).split('\n')[0]);
+    expect(errors).toEqual([
+      'HTTP GET /api/suppliers/search responded 500 in 412.7740 ms',
+      'Unhandled exception processing GET /api/suppliers/search',
+      'HTTP POST /api/auth/refresh responded 401 in 0.4664 ms',
+    ]);
+  });
+
+  it('does not take request fields from lines that only mention a request', () => {
+    const x = parseText('2026-03-14 09:30:01 [INF] Retrying HTTP GET /a responded 200 in 5 ms', 'generic');
+    expect(x.schema.some((c) => c.role === 'status')).toBe(false);
+  });
+});
+

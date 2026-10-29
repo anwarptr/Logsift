@@ -129,7 +129,7 @@ export function isAcceptedFile(name: string): boolean {
 const DEFAULT_HIDDEN = new Set(['cs(Cookie)', 'sc-substatus', 'sc-win32-status', 'timestamp_raw']);
 
 export function defaultColumnWidth(col: ColumnDef): number {
-  if (col.type === 'timestamp') return 168;
+  if (col.type === 'timestamp') return 190; // fits "2026-03-14 09:30:01.102"
   if (col.role === 'message') return 520;
   if (col.role === 'uri' || col.role === 'userAgent' || col.key === 'arrLogId') return 240;
   if (col.role === 'status' || col.role === 'method' || col.role === 'level') return 76;

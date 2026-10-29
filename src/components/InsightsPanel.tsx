@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { FacetEntry } from '../filters/facets';
+import { ERROR_BASIS_LABELS } from '../filters/logIndex';
 import { useLogStore } from '../store/logStore';
 import { useDisplayZone, useInsights } from '../store/useView';
 import { formatBytes, formatNumber, formatTimestamp } from '../utils/format';
@@ -105,7 +106,7 @@ export function InsightsPanel() {
           <Card
             label="Error rate"
             value={`${errorRate.toFixed(errorRate > 0 && errorRate < 10 ? 1 : 0)}%`}
-            sub={`${formatNumber(ins.errors)} ${ins.errorBasis === 'status' ? '≥ 400' : 'ERROR/FATAL'}`}
+            sub={`${formatNumber(ins.errors)} ${ERROR_BASIS_LABELS[ins.errorBasis]}`}
           />
         )}
         {ins.duration && (

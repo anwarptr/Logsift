@@ -1,5 +1,5 @@
 import type { LogRow } from '../parser';
-import { FLAG_ERROR_LEVEL, FLAG_HEALTH, FLAG_SCM, type LogIndex } from './logIndex';
+import { FLAG_HEALTH, FLAG_SCM, isErrorRow, type LogIndex } from './logIndex';
 import type { FilterState } from './types';
 
 /**
@@ -154,13 +154,8 @@ export function evaluateFilters(
   if (f.hideScm && index.hasScm) {
     for (let i = 0; i < n; i++) if (flags[i]! & FLAG_SCM) mask[i]! |= BIT_OTHER;
   }
-  if (f.onlyErrors) {
-    if (index.status) {
-      const st = index.status;
-      for (let i = 0; i < n; i++) if (!(st[i]! >= 400)) mask[i]! |= BIT_OTHER;
-    } else if (index.hasLevel) {
-      for (let i = 0; i < n; i++) if (!(flags[i]! & FLAG_ERROR_LEVEL)) mask[i]! |= BIT_OTHER;
-    }
+  if (f.onlyErrors && (index.status || index.hasLevel)) {
+    for (let i = 0; i < n; i++) if (!isErrorRow(index, i)) mask[i]! |= BIT_OTHER;
   }
   if (f.onlySlow && index.duration) {
     const d = index.duration;

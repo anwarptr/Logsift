@@ -1,5 +1,5 @@
 import { topN, type FacetEntry } from '../filters/facets';
-import { FLAG_ERROR_LEVEL, type LogIndex } from '../filters/logIndex';
+import { errorBasisOf, isErrorRow, type ErrorBasis, type LogIndex } from '../filters/logIndex';
 import type { ColumnDef, LogRow } from '../parser';
 import { autoBucketSize, histogram, summarize, type Histogram, type NumberSummary } from './stats';
 import { alignOffsetMs, UTC_ZONE, type DisplayZone } from './timezone';
@@ -7,8 +7,8 @@ import { alignOffsetMs, UTC_ZONE, type DisplayZone } from './timezone';
 export interface Insights {
   total: number;
   errors: number;
-  /** Whether "errors" is based on HTTP status (true) or log level (false); null if neither exists. */
-  errorBasis: 'status' | 'level' | null;
+  /** What "errors" means: HTTP status ≥ 400, ERROR/FATAL level, or status with level as fallback for rows without one. */
+  errorBasis: ErrorBasis;
   duration: NumberSummary | null;
   bytesSent: number | null;
   timeline: (Histogram & { errors: Uint32Array }) | null;
@@ -46,11 +46,9 @@ export function computeInsights(
   // Errors.
   let errors = 0;
   const isError = new Uint8Array(n);
-  const errorBasis = index.status ? 'status' : index.hasLevel ? 'level' : null;
-  if (index.status) {
-    for (let i = 0; i < n; i++) if (index.status[matched[i]!]! >= 400) (isError[i] = 1), errors++;
-  } else if (index.hasLevel) {
-    for (let i = 0; i < n; i++) if (index.flags[matched[i]!]! & FLAG_ERROR_LEVEL) (isError[i] = 1), errors++;
+  const errorBasis = errorBasisOf(index);
+  if (errorBasis) {
+    for (let i = 0; i < n; i++) if (isErrorRow(index, matched[i]!)) (isError[i] = 1), errors++;
   }
 
   // Duration stats + slowest.

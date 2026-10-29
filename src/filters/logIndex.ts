@@ -70,6 +70,29 @@ export const FLAG_HEALTH = 1;
 export const FLAG_SCM = 2;
 export const FLAG_ERROR_LEVEL = 4;
 
+/**
+ * A row is an error when its HTTP status is ≥ 400; rows without a status (application lines mixed
+ * in with request lines, as in Serilog text logs) fall back to an ERROR/FATAL level.
+ */
+export function isErrorRow(index: LogIndex, r: number): boolean {
+  const st = index.status ? index.status[r]! : Number.NaN;
+  return Number.isNaN(st) ? (index.flags[r]! & FLAG_ERROR_LEVEL) !== 0 : st >= 400;
+}
+
+export type ErrorBasis = 'status' | 'level' | 'status+level' | null;
+
+export function errorBasisOf(index: LogIndex): ErrorBasis {
+  if (index.hasStatus) return index.hasLevel ? 'status+level' : 'status';
+  return index.hasLevel ? 'level' : null;
+}
+
+/** Short description of what counts as an error, for labels. */
+export const ERROR_BASIS_LABELS: Record<NonNullable<ErrorBasis>, string> = {
+  status: '≥ 400',
+  level: 'ERROR/FATAL',
+  'status+level': '≥ 400 or ERROR',
+};
+
 function byRole(schema: ColumnDef[], role: ColumnRole): ColumnDef | undefined {
   return schema.find((c) => c.role === role);
 }

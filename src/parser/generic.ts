@@ -43,11 +43,25 @@ export function parseLooseIso(s: string): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
+/**
+ * ASP.NET Core request log written by Serilog's UseSerilogRequestLogging():
+ *   HTTP GET /api/products responded 200 in 442.7618 ms
+ */
+export const SERILOG_REQUEST_RE = /^HTTP ([A-Z]+) (\S+) responded (\d{3}) in (\d+(?:\.\d+)?) ms\b/;
+
 const COLUMNS = {
   level: { key: 'level', label: 'level', type: 'string', role: 'level' } as ColumnDef,
   logger: { key: 'logger', label: 'logger', type: 'string', role: 'logger' } as ColumnDef,
   message: { key: 'message', label: 'message', type: 'string', role: 'message' } as ColumnDef,
 };
+
+// Named after the Serilog properties they come from.
+const REQUEST_COLUMNS: ColumnDef[] = [
+  { key: 'RequestMethod', label: 'RequestMethod', type: 'string', role: 'method' },
+  { key: 'RequestPath', label: 'RequestPath', type: 'string', role: 'uri' },
+  { key: 'StatusCode', label: 'StatusCode', type: 'number', role: 'status' },
+  { key: 'Elapsed', label: 'Elapsed (ms)', type: 'number', role: 'duration' },
+];
 
 export function createGenericParser(): LineParser {
   let rows: LogRow[] = [];
@@ -57,6 +71,7 @@ export function createGenericParser(): LineParser {
   let malformedId = 0;
   let sawLevel = false;
   let sawLogger = false;
+  let sawRequest = false;
   const zones = new OffsetTracker();
 
   function pushLine(line: string, lineNo: number): void {
@@ -70,7 +85,16 @@ export function createGenericParser(): LineParser {
       const logger = m[3] ?? null;
       if (level) sawLevel = true;
       if (logger) sawLogger = true;
-      const values: Record<string, CellValue> = { timestamp: ts, level, logger, message: m[4] ?? '' };
+      const message = m[4] ?? '';
+      const values: Record<string, CellValue> = { timestamp: ts, level, logger, message };
+      const req = SERILOG_REQUEST_RE.exec(message);
+      if (req) {
+        sawRequest = true;
+        values.RequestMethod = req[1]!;
+        values.RequestPath = req[2]!;
+        values.StatusCode = Number(req[3]);
+        values.Elapsed = Number(req[4]);
+      }
       pending = { id: rowId++, lineNo, ts, values, raw: line };
       return;
     }
@@ -102,6 +126,7 @@ export function createGenericParser(): LineParser {
     const cols: ColumnDef[] = [{ ...TIMESTAMP_COLUMN }];
     if (sawLevel) cols.push({ ...COLUMNS.level });
     if (sawLogger) cols.push({ ...COLUMNS.logger });
+    if (sawRequest) for (const c of REQUEST_COLUMNS) cols.push({ ...c });
     cols.push({ ...COLUMNS.message });
     return cols;
   }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { FilterEval } from '../filters/applyFilters';
 import { facetCounts, statusClassCounts, topUris } from '../filters/facets';
-import type { FacetColumn, LogIndex, RangeColumn } from '../filters/logIndex';
+import { ERROR_BASIS_LABELS, errorBasisOf, type FacetColumn, type LogIndex, type RangeColumn } from '../filters/logIndex';
 import { STATUS_CLASSES, type Range, type StatusClass, type UriMode } from '../filters/types';
 import { useLogStore } from '../store/logStore';
 import { useDisplayZone, useFilterEval, useLogIndex } from '../store/useView';
@@ -56,7 +56,7 @@ function QuickToggles({ index }: { index: LogIndex }) {
         )}
         {canErrors && (
           <Toggle
-            label={index.hasStatus ? 'Only errors (≥ 400)' : 'Only errors (ERROR/FATAL)'}
+            label={`Only errors (${ERROR_BASIS_LABELS[errorBasisOf(index)!]})`}
             checked={f.onlyErrors}
             onChange={(v) => setFilters({ onlyErrors: v })}
           />
