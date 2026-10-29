@@ -1,5 +1,5 @@
 import type { WorkerRequest, WorkerResponse } from './protocol';
-import { CancelledError, ParseError, streamParse } from './streamParse';
+import { CancelledError, ParseError, streamParseSources } from './streamParse';
 
 const ctx = self as unknown as {
   postMessage(msg: WorkerResponse): void;
@@ -15,13 +15,13 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     cancelled.add(msg.jobId);
     return;
   }
-  const { jobId, file, format } = msg;
+  const { jobId, sources, format } = msg;
   const started = performance.now();
   try {
-    const summary = await streamParse(file, {
+    const summary = await streamParseSources(sources, {
       format,
       isCancelled: () => cancelled.has(jobId),
-      onStart: (fmt, detected) => post({ type: 'start', jobId, format: fmt, detected }),
+      onStart: (fmt, detected, files) => post({ type: 'start', jobId, format: fmt, detected, files }),
       onBatch: (batch) => post({ type: 'batch', jobId, ...batch }),
       onProgress: (bytesRead, totalBytes, lines) => post({ type: 'progress', jobId, bytesRead, totalBytes, lines }),
     });

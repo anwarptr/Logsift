@@ -19,9 +19,22 @@ npm run test:perf    # 500k-line parse benchmark (logs timings)
 npm run gen:iis -- 500000 big.log   # write a synthetic IIS log to try in the UI
 ```
 
-Open the app, then drop a `.log`/`.txt` file anywhere on the page, use **Choose file…**, paste log text
-(**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click **Load sample data** (loads
-`fixtures/sample-iis.log`, bundled into the app).
+Open the app, then drop one or more `.log`/`.txt` files (or `.gz`/`.zip` archives of them) anywhere on the page,
+use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
+**Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
+
+### Several files and archives
+
+Select or drop several files at once — for example a day of hourly IIS logs — and they are parsed as one log:
+files are read in natural name order (`u_ex26102709.log` before `u_ex26102710.log`), rows from overlapping files are
+interleaved by timestamp, and a **source file** column (also a filter) says where each row came from. Line numbers
+stay per file, and the row details and Malformed tab show the file name.
+
+- **`.gz`** files are decompressed while streaming (`u_ex261027.log.gz` → `u_ex261027.log`).
+- **`.zip`** archives are expanded: every `.log`/`.txt` entry is parsed (other files and folders are ignored).
+  Stored and deflated entries are supported; ZIP64 and password-protected archives are not.
+- Decompression uses the browser's built-in `DecompressionStream`, so it adds no code and nothing is uploaded.
+- Empty or unsupported files in a selection are skipped with a notice; the rest still open.
 
 ## Supported formats
 
@@ -61,7 +74,7 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 
 ## Features
 
-- **File input**: drag-and-drop or picker (`.log`/`.txt` only), or pasted text, progress bar while parsing, file name / size /
+- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
   rows parsed / lines skipped / detected format / parse time, metadata (`#`) lines, clear errors for wrong type,
   empty, binary or unparseable files.
 - **Table**: virtualized (tested to stay smooth at 500k rows), sticky header, click-to-sort (asc → desc → off),
@@ -116,11 +129,15 @@ scripts/gen-iis.ts   synthetic IIS log generator (CLI + used by the benchmark)
 tests/               parser, worker, filters, utils, ui (jsdom), perf
 ```
 
-**Parsing pipeline.** The worker reads the `File` in 4 MB `Blob.slice`s, decodes with a streaming `TextDecoder`
-(so multi-byte characters split across chunks are safe), carries the partial last line to the next chunk, and
-feeds lines to the format's `LineParser`. Every 20k rows it posts a batch (rows + malformed + metadata + current
-schema) and a progress message, so the main thread never blocks on parsing. The same `streamParse` function is
-unit-tested in Node with different chunk sizes.
+**Parsing pipeline.** The worker first expands the inputs (ZIP entries via `unzip.ts`, which reads the central
+directory; `.gz` via `DecompressionStream`) into a list of text inputs in natural name order. Plain files are read
+in 4 MB `Blob.slice`s, compressed ones as decompressed streams; either way the bytes go through a streaming
+`TextDecoder` (so multi-byte characters split across chunks are safe), the partial last line is carried to the next
+chunk, and lines are fed to one `LineParser` shared by all files (format detected from the first file). Each file
+ends with `finish()`, so no multi-line entry spans two files. Every 20k rows it posts a batch (rows + malformed +
+metadata + current schema) and a progress message, so the main thread never blocks on parsing. When parsing
+finishes, rows from several files are merged by timestamp (`mergeByTime`, stable, skipped when already in order).
+The same `streamParseSources` function is unit-tested in Node with different chunk sizes, gzip and ZIP inputs.
 
 **Rows** keep a typed `values` record, a UTC `ts`, the 1-based `lineNo` and the `raw` line. Each column has a
 semantic **role** (`status`, `duration`, `uri`, `clientIp`, `level`, `healthCheck`, …) — filters, insights and
@@ -137,7 +154,8 @@ table, sidebar and insights share one computation.
 
 **Measured** (`npm run test:perf`, 500,000 synthetic IIS lines / 85 MB, Node 24 on a dev laptop):
 parse ≈ 1.0–1.3 s (target < 5 s), build index ≈ 0.5 s, combined filter ≈ 60 ms, regex search ≈ 30–50 ms,
-insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap after parsing. Numbers vary by machine; the test fails only above 10 s.
+insights ≈ 0.3 s, sort ≈ 0.1 s (number) / 0.3 s (string), ≈ 450 MB heap after parsing; the streaming (worker)
+path ≈ 1.2 s plain and ≈ 1.0 s from a 19 MB `.gz`. Numbers vary by machine; the test fails only above 10 s.
 
 ## Design decisions
 

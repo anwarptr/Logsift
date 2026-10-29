@@ -37,7 +37,9 @@ export type ColumnRole =
   | 'message'
   | 'logger'
   | 'healthCheck'
-  | 'scm';
+  | 'scm'
+  /** Which file a row came from, when several files are opened together. */
+  | 'source';
 
 export interface ColumnDef {
   key: string;
@@ -65,6 +67,8 @@ export interface MalformedRow {
   lineNo: number;
   raw: string;
   reason: string;
+  /** Source file name, when several files are opened together. */
+  file?: string;
 }
 
 export interface ParsedChunk {

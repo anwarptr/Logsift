@@ -7,6 +7,7 @@ import type { LineParser, LogFormat, LogRow, MalformedRow, ParseResult } from '.
 
 export * from './types';
 export { detectFormat } from './detectFormat';
+export { SOURCE_COLUMN } from './schema';
 export { IIS_TIME_ZONE, OffsetTracker, parseZoneSuffix } from './timezone';
 
 export function createParser(format: LogFormat): LineParser {

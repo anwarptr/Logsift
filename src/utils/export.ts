@@ -55,6 +55,6 @@ export function toJsonParts(
 }
 
 export function exportFileName(source: string | undefined, ext: string): string {
-  const base = (source ?? 'logs').replace(/\.[^.]+$/, '');
+  const base = (source ?? 'logs').replace(/\.[^.]+$/, '').replace(/\s+/g, '-');
   return `${base}-filtered.${ext}`;
 }

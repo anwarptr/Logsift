@@ -11,9 +11,8 @@ export function loadSample(): void {
 
 /** File picker + drag-and-drop target. In compact mode it renders as toolbar buttons. */
 export function DropZone({ compact = false }: { compact?: boolean }) {
-  const loadFile = useLogStore((s) => s.loadFile);
+  const loadFiles = useLogStore((s) => s.loadFiles);
   const loadText = useLogStore((s) => s.loadText);
-  const setError = useLogStore((s) => s.setError);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pasting, setPasting] = useState(false);
@@ -40,21 +39,16 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       depth = 0;
       setDragging(false);
       const files = e.dataTransfer?.files;
-      if (!files || files.length === 0) return;
-      if (files.length > 1) {
-        setError('Drop a single file at a time.');
-        return;
-      }
-      loadFile(files[0]!);
+      if (files && files.length > 0) loadFiles(files);
     };
-    // Ctrl+V anywhere outside a text field loads the clipboard (a copied file or plain text).
+    // Ctrl+V anywhere outside a text field loads the clipboard (copied files or plain text).
     const onPaste = (e: ClipboardEvent) => {
       if (e.defaultPrevented || isEditable(document.activeElement) || !e.clipboardData) return;
-      const file = e.clipboardData.files[0];
+      const files = e.clipboardData.files;
       const text = e.clipboardData.getData('text/plain');
-      if (!file && !text) return;
+      if (!files.length && !text) return;
       e.preventDefault();
-      if (file) loadFile(file);
+      if (files.length) loadFiles(files);
       else loadText(text);
     };
     window.addEventListener('dragenter', onEnter);
@@ -69,7 +63,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       window.removeEventListener('drop', onDrop);
       window.removeEventListener('paste', onPaste);
     };
-  }, [loadFile, loadText, setError]);
+  }, [loadFiles, loadText]);
 
   const input = (
     <input
@@ -77,11 +71,12 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       type="file"
       accept={ACCEPTED_EXTENSIONS.join(',')}
       className="visually-hidden"
+      multiple
       tabIndex={-1}
       aria-hidden="true"
       onChange={(e) => {
-        const f = e.target.files?.[0];
-        if (f) loadFile(f);
+        const files = e.target.files;
+        if (files?.length) loadFiles(files);
         e.target.value = '';
       }}
     />
@@ -89,7 +84,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
 
   const overlay = dragging && (
     <div className="drop-overlay" aria-hidden="true">
-      <div>Drop a .log or .txt file to open it</div>
+      <div>Drop log files (.log, .txt, .gz, .zip) to open them</div>
     </div>
   );
 
@@ -104,7 +99,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
     return (
       <>
         <button type="button" className="btn" onClick={() => inputRef.current?.click()}>
-          Open file…
+          Open files…
         </button>
         {pasteButton}
         {input}
@@ -126,14 +121,15 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
           strokeLinejoin="round"
         />
       </svg>
-      <h2>Drop a log file here</h2>
+      <h2>Drop log files here</h2>
       <p className="muted">
-        IIS W3C, Apache/Nginx, JSON lines or plain text logs (.log, .txt), or paste log text (Ctrl+V). Everything is
-        parsed locally and never uploaded.
+        IIS W3C, Apache/Nginx, JSON lines or plain text logs (.log, .txt, or compressed .gz/.zip). Several files are
+        merged into one timeline. You can also paste log text (Ctrl+V). Everything is parsed locally and never
+        uploaded.
       </p>
       <div className="dropzone-actions">
         <button type="button" className="btn primary" onClick={() => inputRef.current?.click()}>
-          Choose file…
+          Choose files…
         </button>
         {pasteButton}
         <button type="button" className="btn" onClick={loadSample}>

@@ -34,7 +34,9 @@ export function MalformedList() {
               style={{ transform: `translateY(${vi.start}px)`, height: ROW_H }}
             >
               <div className="malformed-meta">
-                <span className="mono">Line {m.lineNo.toLocaleString()}</span>
+                <span className="mono">
+                  {m.file ? `${m.file}, line` : 'Line'} {m.lineNo.toLocaleString()}
+                </span>
                 <span className="warn-text">{m.reason}</span>
                 <button
                   type="button"

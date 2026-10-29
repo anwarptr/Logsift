@@ -31,7 +31,10 @@ export function RowDetailPanel() {
   return (
     <aside className="detail-panel" aria-label={`Details for line ${row.lineNo}`}>
       <div className="detail-head">
-        <h2>Line {row.lineNo.toLocaleString()}</h2>
+        <h2>
+          Line {row.lineNo.toLocaleString()}
+          {typeof row.values.sourceFile === 'string' && <span className="detail-file"> · {row.values.sourceFile}</span>}
+        </h2>
         <button
           ref={closeRef}
           type="button"

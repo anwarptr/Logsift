@@ -1,8 +1,15 @@
-import { createParser, detectFormat } from '../parser';
+import { createParser, detectFormat, SOURCE_COLUMN } from '../parser';
 import type { ColumnDef, LineParser, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
+import { isZipName, listZipEntries, zipEntryData, ZipError } from './unzip';
 
 export const CHUNK_BYTES = 4 * 1024 * 1024;
 export const BATCH_ROWS = 20_000;
+
+/** A file to parse. `.gz` files and `.zip` archives are decompressed on the fly. */
+export interface LogSource {
+  name: string;
+  blob: Blob;
+}
 
 export interface StreamBatch {
   rows: LogRow[];
@@ -16,7 +23,8 @@ export interface StreamParseOptions {
   format?: LogFormat;
   chunkBytes?: number;
   batchRows?: number;
-  onStart?(format: LogFormat, detected: LogFormat): void;
+  /** `files` are the log files actually parsed (archives expanded), in parse order. */
+  onStart?(format: LogFormat, detected: LogFormat, files: string[]): void;
   onBatch(batch: StreamBatch): void;
   onProgress?(bytesRead: number, totalBytes: number, lines: number): void;
   isCancelled?(): boolean;
@@ -26,6 +34,7 @@ export interface StreamParseSummary {
   format: LogFormat;
   detected: LogFormat;
   schema: ColumnDef[];
+  files: string[];
   lines: number;
   rows: number;
   malformed: number;
@@ -34,6 +43,13 @@ export interface StreamParseSummary {
 
 export class ParseError extends Error {}
 export class CancelledError extends Error {}
+
+/** Accepted inside archives. */
+const LOG_NAME_RE = /\.(log|txt)$/i;
+const GZIP_RE = /\.gz$/i;
+
+/** Natural order, so u_ex26102709.log sorts before u_ex26102710.log and file2 before file10. */
+export const compareNames = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 /** Heuristic: lots of NULs or U+FFFD replacement chars means this is not a text log. */
 function looksBinary(text: string): boolean {
@@ -47,84 +63,222 @@ function looksBinary(text: string): boolean {
   return bad / n > 0.05;
 }
 
+/** `consumed` is how many bytes of the original (possibly compressed) source this chunk accounts for. */
+interface Chunk {
+  bytes: Uint8Array;
+  consumed: number;
+}
+
+interface Input {
+  name: string;
+  chunks(): AsyncGenerator<Chunk>;
+}
+
+async function* sliceChunks(blob: Blob, chunkBytes: number): AsyncGenerator<Chunk> {
+  for (let offset = 0; offset < blob.size; offset += chunkBytes) {
+    const end = Math.min(offset + chunkBytes, blob.size);
+    yield { bytes: new Uint8Array(await blob.slice(offset, end).arrayBuffer()), consumed: end - offset };
+  }
+}
+
+async function* decompressChunks(name: string, compressed: Blob, format: CompressionFormat): AsyncGenerator<Chunk> {
+  let read = 0;
+  let reported = 0;
+  const counter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, ctl) {
+      read += chunk.byteLength;
+      ctl.enqueue(chunk);
+    },
+  });
+  const reader = compressed
+    .stream()
+    .pipeThrough(counter)
+    .pipeThrough(new DecompressionStream(format) as unknown as TransformStream<Uint8Array, Uint8Array>)
+    .getReader();
+  let done = false;
+  try {
+    for (;;) {
+      let res: ReadableStreamReadResult<Uint8Array>;
+      try {
+        res = await reader.read();
+      } catch (e) {
+        throw new ParseError(`Could not decompress "${name}": ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (res.done) break;
+      yield { bytes: res.value, consumed: read - reported };
+      reported = read;
+    }
+    done = true;
+  } finally {
+    // Stop decompressing if the consumer bailed out early (cancel, error).
+    if (!done) void reader.cancel().catch(() => {});
+  }
+  if (read > reported) yield { bytes: new Uint8Array(0), consumed: read - reported };
+}
+
+/** Expand archives and compressed files into the plain-text inputs to parse, in natural name order. */
+async function expandSources(sources: LogSource[], chunkBytes: number): Promise<Input[]> {
+  const inputs: Input[] = [];
+  for (const s of [...sources].sort((a, b) => compareNames(a.name, b.name))) {
+    if (isZipName(s.name)) {
+      let entries;
+      try {
+        entries = (await listZipEntries(s.blob)).filter((e) => LOG_NAME_RE.test(e.name));
+      } catch (e) {
+        throw new ParseError(`"${s.name}": ${e instanceof ZipError ? e.message : String(e)}`);
+      }
+      if (entries.length === 0) throw new ParseError(`"${s.name}" contains no .log or .txt files.`);
+      entries.sort((a, b) => compareNames(a.name, b.name));
+      for (const entry of entries) {
+        const data = await zipEntryData(s.blob, entry).catch((e: unknown) => {
+          throw new ParseError(`"${s.name}": ${e instanceof Error ? e.message : String(e)}`);
+        });
+        inputs.push({
+          name: entry.name,
+          chunks: () =>
+            entry.method === 8 ? decompressChunks(entry.name, data, 'deflate-raw') : sliceChunks(data, chunkBytes),
+        });
+      }
+    } else if (GZIP_RE.test(s.name)) {
+      inputs.push({ name: s.name.replace(GZIP_RE, ''), chunks: () => decompressChunks(s.name, s.blob, 'gzip') });
+    } else {
+      inputs.push({ name: s.name, chunks: () => sliceChunks(s.blob, chunkBytes) });
+    }
+  }
+  return inputs;
+}
+
+/** Parse a single Blob (kept for callers and tests that deal with one plain file). */
+export function streamParse(blob: Blob, opts: StreamParseOptions): Promise<StreamParseSummary> {
+  return streamParseSources([{ name: 'input.log', blob }], opts);
+}
+
 /**
- * Read a Blob in slices, decode incrementally, split into lines and feed the
- * format parser, emitting rows in batches. Runs in the worker, but has no
+ * Read files chunk by chunk, decode incrementally, split into lines and feed
+ * one format parser, emitting rows in batches. Several files are parsed in
+ * natural name order into one result; each row then gets a `sourceFile` value
+ * and line numbers restart per file. Runs in the worker, but has no
  * worker-specific dependencies so it is unit-testable in Node.
  */
-export async function streamParse(blob: Blob, opts: StreamParseOptions): Promise<StreamParseSummary> {
-  if (blob.size === 0) throw new ParseError('The file is empty.');
+export async function streamParseSources(sources: LogSource[], opts: StreamParseOptions): Promise<StreamParseSummary> {
+  const totalBytes = sources.reduce((sum, s) => sum + s.blob.size, 0);
+  if (totalBytes === 0) throw new ParseError(sources.length > 1 ? 'The files are empty.' : 'The file is empty.');
   const chunkBytes = opts.chunkBytes ?? CHUNK_BYTES;
   const batchRows = opts.batchRows ?? BATCH_ROWS;
-  const decoder = new TextDecoder('utf-8');
+
+  const inputs = await expandSources(sources, chunkBytes);
+  const files = inputs.map((i) => i.name);
+  const multi = inputs.length > 1;
 
   let parser: LineParser | null = null;
   let format: LogFormat = 'generic';
   let detected: LogFormat = 'generic';
-  let offset = 0;
-  let carry = '';
-  let lineNo = 0;
+  let current = '';
+  let bytesRead = 0;
+  let reportedBytes = 0;
+  let lines = 0;
   let pending = 0;
   let totalRows = 0;
   let totalMalformed = 0;
+
+  const schema = () => (multi ? [...parser!.schema(), SOURCE_COLUMN] : parser!.schema());
 
   const emit = (final: boolean) => {
     if (!parser) return;
     const chunk = final ? parser.finish() : parser.drain();
     pending = 0;
     if (chunk.rows.length === 0 && chunk.malformed.length === 0 && chunk.meta.length === 0) return;
+    if (multi) {
+      for (const r of chunk.rows) r.values.sourceFile = current;
+      for (const m of chunk.malformed) m.file = current;
+    }
     totalRows += chunk.rows.length;
     totalMalformed += chunk.malformed.length;
-    opts.onBatch({ ...chunk, schema: parser.schema() });
+    opts.onBatch({ ...chunk, schema: schema() });
   };
 
-  while (offset < blob.size) {
-    if (opts.isCancelled?.()) throw new CancelledError('Cancelled');
-    const end = Math.min(offset + chunkBytes, blob.size);
-    const buf = await blob.slice(offset, end).arrayBuffer();
-    const isFirst = offset === 0;
-    offset = end;
-    const last = offset >= blob.size;
-    let text = carry + decoder.decode(buf, { stream: !last });
-    if (isFirst) {
-      if (looksBinary(text)) throw new ParseError('This file does not look like a text log (binary content detected).');
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-    }
+  const progress = (force: boolean) => {
+    if (!opts.onProgress || (!force && bytesRead - reportedBytes < Math.min(chunkBytes, 1 << 20))) return;
+    reportedBytes = bytesRead;
+    opts.onProgress(bytesRead, totalBytes, lines);
+  };
 
-    let complete: string;
-    if (last) {
-      complete = text;
-      carry = '';
-    } else {
+  for (const input of inputs) {
+    current = input.name;
+    const decoder = new TextDecoder('utf-8');
+    let carry = '';
+    let started = false;
+    let lineNo = 0;
+    let sinceEmit = 0;
+
+    const checkStart = (text: string): string => {
+      if (started || text.length === 0) return text;
+      started = true;
+      if (looksBinary(text)) {
+        throw new ParseError(
+          multi
+            ? `"${input.name}" does not look like a text log (binary content detected).`
+            : 'This file does not look like a text log (binary content detected).',
+        );
+      }
+      return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+    };
+
+    const feed = (complete: string) => {
+      const ls = complete.split('\n');
+      if (!parser) {
+        detected = detectFormat(ls.slice(0, 200));
+        format = opts.format ?? detected;
+        parser = createParser(format);
+        opts.onStart?.(format, detected, files);
+      }
+      for (let i = 0; i < ls.length; i++) {
+        let l = ls[i]!;
+        if (l.charCodeAt(l.length - 1) === 13) l = l.slice(0, -1);
+        lineNo++;
+        lines++;
+        parser.pushLine(l, lineNo);
+        if (++pending >= batchRows) emit(false);
+      }
+    };
+
+    for await (const { bytes, consumed } of input.chunks()) {
+      if (opts.isCancelled?.()) throw new CancelledError('Cancelled');
+      bytesRead += consumed;
+      const text = carry + checkStart(decoder.decode(bytes, { stream: true }));
       const nl = text.lastIndexOf('\n');
       if (nl < 0) {
         carry = text;
-        continue;
+      } else {
+        feed(text.slice(0, nl));
+        carry = text.slice(nl + 1);
+        sinceEmit += nl;
+        if (sinceEmit >= chunkBytes) {
+          emit(false);
+          sinceEmit = 0;
+        }
       }
-      complete = text.slice(0, nl);
-      carry = text.slice(nl + 1);
+      progress(false);
     }
-
-    const lines = complete.split('\n');
-    if (!parser) {
-      detected = detectFormat(lines.slice(0, 200));
-      format = opts.format ?? detected;
-      parser = createParser(format);
-      opts.onStart?.(format, detected);
-    }
-    for (let i = 0; i < lines.length; i++) {
-      let l = lines[i]!;
-      if (l.charCodeAt(l.length - 1) === 13) l = l.slice(0, -1);
-      lineNo++;
-      parser.pushLine(l, lineNo);
-      if (++pending >= batchRows) emit(false);
-    }
-    emit(false);
-    opts.onProgress?.(offset, blob.size, lineNo);
+    const rest = carry + checkStart(decoder.decode());
+    if (started) feed(rest);
+    emit(true);
+    progress(true);
   }
 
-  emit(true);
-  if (!parser) throw new ParseError('The file is empty.');
-  if (totalRows === 0 && totalMalformed === 0) throw new ParseError('No log entries were found in this file.');
-  return { format, detected, schema: parser.schema(), lines: lineNo, rows: totalRows, malformed: totalMalformed, timeZone: parser.timeZone() };
+  if (!parser) throw new ParseError(multi ? 'The files are empty.' : 'The file is empty.');
+  if (totalRows === 0 && totalMalformed === 0) {
+    throw new ParseError(multi ? 'No log entries were found in these files.' : 'No log entries were found in this file.');
+  }
+  const p = parser as LineParser;
+  return {
+    format,
+    detected,
+    schema: schema(),
+    files,
+    lines,
+    rows: totalRows,
+    malformed: totalMalformed,
+    timeZone: p.timeZone(),
+  };
 }

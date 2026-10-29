@@ -42,3 +42,6 @@ export class SchemaBuilder {
 
 /** Shared timestamp column used by every format. */
 export const TIMESTAMP_COLUMN: ColumnDef = { key: 'timestamp', label: 'timestamp', type: 'timestamp', role: 'timestamp' };
+
+/** Added when several files are parsed together: the file each row came from. */
+export const SOURCE_COLUMN: ColumnDef = { key: 'sourceFile', label: 'source file', type: 'string', role: 'source', derived: true };

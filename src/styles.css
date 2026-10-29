@@ -433,6 +433,13 @@ input[type='checkbox'] {
   border-color: var(--accent);
   color: var(--accent);
 }
+.file-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+}
 .file-name {
   max-width: 280px;
   overflow: hidden;

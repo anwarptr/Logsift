@@ -5,21 +5,34 @@ import sampleApache from '../../fixtures/sample-apache.log?raw';
 import sampleJsonl from '../../fixtures/sample-jsonl.log?raw';
 import type { LogFormat } from '../../src/parser';
 import type { WorkerResponse } from '../../src/worker/protocol';
+import type { LogSource } from '../../src/worker/streamParse';
 
-// jsdom has no Worker: run the same streaming parser in-process instead.
+// jsdom has no Worker: run the same streaming parser in-process instead (as parse.worker.ts does).
 vi.mock('../../src/worker/client', () => ({
-  startParse: (file: Blob, format: LogFormat | undefined, onMessage: (m: WorkerResponse) => void) => {
+  startParse: (sources: LogSource[], format: LogFormat | undefined, onMessage: (m: WorkerResponse) => void) => {
     void (async () => {
-      const { parseText } = await import('../../src/parser');
-      const text = await new Promise<string>((resolve) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result));
-        r.readAsText(file);
-      });
-      const res = parseText(text, format);
-      onMessage({ type: 'start', jobId: 1, format: res.format, detected: res.format });
-      onMessage({ type: 'batch', jobId: 1, rows: res.rows, malformed: res.malformed, meta: res.meta, schema: res.schema });
-      onMessage({ type: 'done', jobId: 1, lines: text.split('\n').length, elapsedMs: 1, timeZone: res.timeZone });
+      const { streamParseSources } = await import('../../src/worker/streamParse');
+      // jsdom's Blob lacks arrayBuffer()/stream(); real browsers have them, as does Node's Blob.
+      const { Blob: NodeBlob } = await import('node:buffer');
+      const read = (b: Blob) =>
+        new Promise<ArrayBuffer>((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as ArrayBuffer);
+          r.readAsArrayBuffer(b);
+        });
+      const nodeSources = await Promise.all(
+        sources.map(async (s) => ({ name: s.name, blob: new NodeBlob([await read(s.blob)]) as unknown as Blob })),
+      );
+      try {
+        const summary = await streamParseSources(nodeSources, {
+          format,
+          onStart: (fmt, detected, files) => onMessage({ type: 'start', jobId: 1, format: fmt, detected, files }),
+          onBatch: (batch) => onMessage({ type: 'batch', jobId: 1, ...batch }),
+        });
+        onMessage({ type: 'done', jobId: 1, lines: summary.lines, elapsedMs: 1, timeZone: summary.timeZone });
+      } catch (e) {
+        onMessage({ type: 'error', jobId: 1, message: e instanceof Error ? e.message : String(e) });
+      }
     })();
   },
 }));
@@ -102,6 +115,29 @@ describe('App with the sample IIS log', () => {
     const insights = screen.getByLabelText('Insights for the filtered rows');
     expect(insights.textContent).toContain('Total requests3');
     expect(insights.textContent).toContain('Error rate0%');
+  });
+});
+
+describe('several files', () => {
+  it('merges files into one timeline with a source file facet', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const head = '#Fields: date time cs-method cs-uri-stem sc-status time-taken\n';
+    const a = new File([head + '2026-10-27 10:00:00 GET /a 200 5\n2026-10-27 10:00:10 GET /b 500 7\n'], 'web1.log');
+    const b = new File([head + '2026-10-27 10:00:05 GET /c 404 3\n'], 'web2.log');
+    const bad = new File(['x'], 'notes.pdf');
+    act(() => useLogStore.getState().loadFiles([b, bad, a]));
+    await waitFor(() => expect(rowCount()).toBe('3 of 3 rows'));
+
+    expect(useLogStore.getState().rows.map((r) => r.values['cs-uri-stem'])).toEqual(['/a', '/c', '/b']);
+    const info = screen.getByLabelText('File information');
+    expect(info.textContent).toContain('2 files');
+    expect(info.textContent).toContain('2 log files, merged in time order');
+    expect(screen.getByRole('alert').textContent).toContain('Skipped 1 empty or unsupported file: notes.pdf');
+    const sources = screen.getByRole('list', { name: 'source file values' });
+    expect(sources.textContent).toContain('web1.log');
+    expect(sources.textContent).toContain('web2.log');
+    act(() => useLogStore.getState().setError(null));
   });
 });
 

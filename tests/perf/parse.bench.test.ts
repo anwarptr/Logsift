@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { generateIisLog } from '../../scripts/gen-iis';
 import { evaluateFilters } from '../../src/filters/applyFilters';
@@ -6,6 +7,7 @@ import { EMPTY_FILTERS } from '../../src/filters/types';
 import { parseText } from '../../src/parser';
 import { computeInsights } from '../../src/utils/insights';
 import { sortIndices } from '../../src/utils/sort';
+import { streamParseSources, type StreamBatch } from '../../src/worker/streamParse';
 
 const LINES = 500_000;
 const TARGET_MS = 5_000;
@@ -61,5 +63,27 @@ describe(`performance (${LINES.toLocaleString()} IIS lines)`, () => {
     if (parseMs > TARGET_MS) console.warn(`Parse took ${parseMs.toFixed(0)} ms, above the ${TARGET_MS} ms target`);
     // Hard ceiling with headroom for slow CI machines; the target itself is logged above.
     expect(parseMs).toBeLessThan(TARGET_MS * 2);
+  });
+
+  it('streams the same input (worker path), plain and gzip', async () => {
+    const text = generateIisLog(LINES);
+    const plain = new Blob([text]);
+    const gz = new Blob([gzipSync(text)]);
+    let rows = 0;
+    const onBatch = (b: StreamBatch) => (rows += b.rows.length);
+
+    let t0 = performance.now();
+    await streamParseSources([{ name: 'big.log', blob: plain }], { onBatch });
+    const plainMs = performance.now() - t0;
+    console.log(`${'stream parse (plain)'.padEnd(28)} ${plainMs.toFixed(0).padStart(6)} ms`);
+    expect(rows).toBe(LINES);
+
+    rows = 0;
+    t0 = performance.now();
+    await streamParseSources([{ name: 'big.log.gz', blob: gz }], { onBatch });
+    const gzMs = performance.now() - t0;
+    console.log(`${'stream parse (gzip)'.padEnd(28)} ${gzMs.toFixed(0).padStart(6)} ms  (${(gz.size / 1048576).toFixed(1)} MB compressed)`);
+    expect(rows).toBe(LINES);
+    expect(plainMs).toBeLessThan(TARGET_MS * 2);
   });
 });

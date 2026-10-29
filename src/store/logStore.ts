@@ -4,6 +4,7 @@ import { hasActiveFilters, parseFilters } from '../filters/urlState';
 import type { ColumnDef, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
 import { startParse } from '../worker/client';
 import type { WorkerResponse } from '../worker/protocol';
+import type { LogSource } from '../worker/streamParse';
 import { loadPrefs, savePrefs, type Density, type ThemePref, type TimeDisplay } from './prefs';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -24,9 +25,12 @@ export interface LogState {
   // --- data ---
   status: LoadStatus;
   error: string | null;
+  /** What was opened: one file, or "3 files" with the total size. */
   file: FileMeta | null;
-  /** Kept so the file can be re-parsed with a different format override. */
-  source: Blob | null;
+  /** Kept so the files can be re-parsed with a different format override. */
+  sources: LogSource[];
+  /** Log files actually parsed (archives expanded), in parse order. */
+  files: string[];
   format: LogFormat | null;
   detectedFormat: LogFormat | null;
   formatOverride: LogFormat | 'auto';
@@ -58,6 +62,8 @@ export interface LogState {
   keepFiltersOnLoad: boolean;
 
   loadFile(file: File): void;
+  /** Open several files as one log, merged in time order. Unsupported or empty files are skipped. */
+  loadFiles(files: Iterable<File>): void;
   /** Parse pasted text exactly like a file (same worker pipeline). */
   loadText(text: string): void;
   setFilters(patch: Partial<FilterState>): void;
@@ -80,10 +86,32 @@ export interface LogState {
   setTimeDisplay(d: TimeDisplay): void;
 }
 
-export const ACCEPTED_EXTENSIONS = ['.log', '.txt'];
+export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.gz', '.zip'];
 
 /** Display name for text pasted instead of a file (also the base of export file names). */
 export const PASTED_NAME = 'pasted-text.txt';
+
+/**
+ * Interleave rows from several files by timestamp (stable, so equal times keep file order;
+ * rows without a timestamp go last) and renumber ids to match the new positions.
+ */
+export function mergeByTime(rows: LogRow[]): LogRow[] {
+  let ordered = true;
+  let last = -Infinity;
+  for (const r of rows) {
+    if (r.ts === null) continue;
+    if (r.ts < last) {
+      ordered = false;
+      break;
+    }
+    last = r.ts;
+  }
+  if (ordered) return rows;
+  const key = (r: LogRow) => r.ts ?? Infinity;
+  const sorted = [...rows].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  sorted.forEach((r, i) => (r.id = i));
+  return sorted;
+}
 
 export function isAcceptedFile(name: string): boolean {
   const lower = name.toLowerCase();
@@ -124,18 +152,19 @@ export const useLogStore = create<LogState>()((set, get) => {
     return { columnOrder: [...s.columnOrder, ...added.map((c) => c.key)], hiddenColumns: hidden, columnWidths: widths };
   }
 
-  function parse(source: Blob, file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean) {
+  function parse(sources: LogSource[], file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean) {
     if (resetFilters && !get().keepFiltersOnLoad) set({ filters: EMPTY_FILTERS });
     set({
       keepFiltersOnLoad: false,
       status: 'loading',
       error: null,
       file,
-      source,
+      sources,
+      files: [],
       format: null,
       detectedFormat: null,
       formatOverride: override,
-      progress: { bytesRead: 0, totalBytes: source.size, lines: 0 },
+      progress: { bytesRead: 0, totalBytes: file.size, lines: 0 },
       parseMs: null,
       rows: [],
       malformed: [],
@@ -149,10 +178,10 @@ export const useLogStore = create<LogState>()((set, get) => {
       selectedId: null,
       tab: 'rows',
     });
-    startParse(source, override === 'auto' ? undefined : override, (msg: WorkerResponse) => {
+    startParse(sources, override === 'auto' ? undefined : override, (msg: WorkerResponse) => {
       switch (msg.type) {
         case 'start':
-          set({ format: msg.format, detectedFormat: msg.detected });
+          set({ format: msg.format, detectedFormat: msg.detected, files: msg.files });
           break;
         case 'batch': {
           const s = get();
@@ -170,6 +199,8 @@ export const useLogStore = create<LogState>()((set, get) => {
           break;
         case 'done':
           set((s) => ({
+            // Several files: interleave their rows by time (each file is already in order).
+            rows: s.files.length > 1 ? mergeByTime(s.rows) : s.rows,
             status: 'ready',
             parseMs: msg.elapsedMs,
             logTimeZone: msg.timeZone,
@@ -189,7 +220,8 @@ export const useLogStore = create<LogState>()((set, get) => {
     status: 'idle',
     error: null,
     file: null,
-    source: null,
+    sources: [],
+    files: [],
     format: null,
     detectedFormat: null,
     formatOverride: 'auto',
@@ -229,15 +261,35 @@ export const useLogStore = create<LogState>()((set, get) => {
     },
 
     loadFile(file) {
-      if (!isAcceptedFile(file.name)) {
-        set({ error: `"${file.name}" is not supported. Choose a .log or .txt file.` });
+      get().loadFiles([file]);
+    },
+
+    loadFiles(input) {
+      const all = [...input];
+      if (all.length === 0) return;
+      const ok = all.filter((f) => isAcceptedFile(f.name) && f.size > 0);
+      if (ok.length === 0) {
+        const f = all[0]!;
+        let error: string;
+        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .gz or .zip files.';
+        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .gz or .zip file.`;
+        else error = `"${f.name}" is empty.`;
+        set({ error });
         return;
       }
-      if (file.size === 0) {
-        set({ error: `"${file.name}" is empty.` });
-        return;
+      const size = ok.reduce((sum, f) => sum + f.size, 0);
+      const name = ok.length === 1 ? ok[0]!.name : `${ok.length} files`;
+      parse(
+        ok.map((f) => ({ name: f.name, blob: f })),
+        { name, size },
+        get().formatOverride,
+        true,
+      );
+      const skipped = all.filter((f) => !ok.includes(f));
+      if (skipped.length) {
+        const names = skipped.map((f) => f.name).join(', ');
+        set({ error: `Skipped ${skipped.length} empty or unsupported file${skipped.length > 1 ? 's' : ''}: ${names}` });
       }
-      parse(file, { name: file.name, size: file.size }, get().formatOverride, true);
     },
 
     loadText(text) {
@@ -246,12 +298,12 @@ export const useLogStore = create<LogState>()((set, get) => {
         return;
       }
       const blob = new Blob([text], { type: 'text/plain' });
-      parse(blob, { name: PASTED_NAME, size: blob.size }, get().formatOverride, true);
+      parse([{ name: PASTED_NAME, blob }], { name: PASTED_NAME, size: blob.size }, get().formatOverride, true);
     },
 
     setFormatOverride(format) {
-      const { source, file } = get();
-      if (source && file) parse(source, file, format, false);
+      const { sources, file } = get();
+      if (sources.length && file) parse(sources, file, format, false);
       else set({ formatOverride: format });
     },
 

@@ -392,6 +392,15 @@ mark {
 .detail-head h2 {
   margin: 0;
   font-size: 15px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-file {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--fg-muted);
 }
 .detail-panel h3 {
   font-size: 13px;

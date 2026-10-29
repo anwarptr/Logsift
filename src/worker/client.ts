@@ -1,5 +1,6 @@
 import type { LogFormat } from '../parser';
 import type { WorkerRequest, WorkerResponse } from './protocol';
+import type { LogSource } from './streamParse';
 
 type Handler = (msg: WorkerResponse) => void;
 
@@ -21,11 +22,11 @@ function getWorker(): Worker {
   return worker;
 }
 
-/** Start parsing a file in the worker, cancelling any job in flight. */
-export function startParse(file: Blob, format: LogFormat | undefined, onMessage: Handler): void {
+/** Start parsing files in the worker, cancelling any job in flight. */
+export function startParse(sources: LogSource[], format: LogFormat | undefined, onMessage: Handler): void {
   const w = getWorker();
   if (currentJob) w.postMessage({ type: 'cancel', jobId: currentJob } satisfies WorkerRequest);
   currentJob++;
   currentHandler = onMessage;
-  w.postMessage({ type: 'parse', jobId: currentJob, file, format } satisfies WorkerRequest);
+  w.postMessage({ type: 'parse', jobId: currentJob, sources, format } satisfies WorkerRequest);
 }

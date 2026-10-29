@@ -78,6 +78,7 @@ export function FileInfo() {
   const parseMs = useLogStore((s) => s.parseMs);
   const status = useLogStore((s) => s.status);
   const tz = useLogStore((s) => s.logTimeZone);
+  const files = useLogStore((s) => s.files);
 
   if (!file) return null;
 
@@ -131,6 +132,21 @@ export function FileInfo() {
         </div>
         {tz && <TimeZoneInfo tz={tz} />}
       </dl>
+      {(files.length > 1 || (files.length === 1 && files[0] !== file.name)) && (
+        <details className="file-meta">
+          <summary>
+            {files.length} log file{files.length > 1 ? 's' : ''}
+            {files.length > 1 && ', merged in time order'}
+          </summary>
+          <ul className="file-list">
+            {files.map((f) => (
+              <li key={f} className="mono">
+                {f}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {meta.length > 0 && (
         <details className="file-meta">
           <summary>{meta.length} metadata lines</summary>
