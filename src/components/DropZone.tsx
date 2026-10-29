@@ -84,7 +84,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
 
   const overlay = dragging && (
     <div className="drop-overlay" aria-hidden="true">
-      <div>Drop log files (.log, .txt, .gz, .zip) to open them</div>
+      <div>Drop log files (.log, .txt, .json, .gz, .zip) to open them</div>
     </div>
   );
 
@@ -122,7 +122,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
         />
       </svg>
       <h2>Drop log files here</h2>
-      <p className="muted">.log and .txt files, or .gz/.zip archives of them. Nothing leaves your computer.</p>
+      <p className="muted">.log, .txt and .json files, or .gz/.zip archives of them. Nothing leaves your computer.</p>
       <div className="dropzone-actions">
         <button type="button" className="btn primary" onClick={() => inputRef.current?.click()}>
           Choose files…

@@ -36,7 +36,7 @@ It serves the production build (`vite preview`) on localhost only, so other mach
 leave your PC. Opening `dist\index.html` directly from disk does not work, because browsers block the parser's
 worker on `file://` pages; that's why the launcher runs a small local server.
 
-Open the app, then drop one or more `.log`/`.txt` files (or `.gz`/`.zip` archives of them) anywhere on the page,
+Open the app, then drop one or more `.log`/`.txt`/`.json` files (or `.gz`/`.zip` archives of them) anywhere on the page,
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
 
@@ -48,7 +48,8 @@ interleaved by timestamp, and a **source file** column (also a filter) says wher
 stay per file, and the row details and Malformed tab show the file name.
 
 - **`.gz`** files are decompressed while streaming (`u_ex261027.log.gz` → `u_ex261027.log`).
-- **`.zip`** archives are expanded: every `.log`/`.txt` entry is parsed (other files and folders are ignored).
+- **`.zip`** archives are expanded: every `.log`/`.txt`/`.json`/`.jsonl`/`.ndjson`/`.clef` entry is parsed (other
+  files and folders are ignored).
   Stored and deflated entries are supported; ZIP64 and password-protected archives are not.
 - Decompression uses the browser's built-in `DecompressionStream`, so it adds no code and nothing is uploaded.
 - Empty or unsupported files in a selection are skipped with a notice; the rest still open.
@@ -71,7 +72,8 @@ re-parses the file with a forced format.
 | --- | --- | --- |
 | **IIS W3C Extended** | any `#Software:` / `#Fields:` line | Columns come from `#Fields:`; a new `#Fields:` mid-file switches the schema from that line on. `#` lines go to the File Info metadata list. `-` → null. `date`+`time` → one UTC `timestamp`. Numeric fields (`s-port`, `sc-status`, `sc-substatus`, `sc-win32-status`, `sc-bytes`, `cs-bytes`, `time-taken`) become numbers. |
 | **Apache/Nginx combined** (and common) | ≥ 60% of lines match | Mapped to IIS-style column names (`c-ip`, `cs-method`, `cs-uri-stem`, `sc-status`, `sc-bytes`, …) so the same filters and insights apply. |
-| **JSON lines** | ≥ 60% of lines are JSON objects | Columns are the union of keys; nested values are shown as JSON. `timestamp`/`@timestamp`/`time`/`ts`/`date` becomes the timestamp; `level`/`severity`, `message`/`msg`, `logger`/`source`, `status`, `path`/`url`, `durationMs` get semantic roles. |
+| **JSON lines** | ≥ 60% of lines are JSON objects | Columns are the union of keys; nested values are shown as JSON. `timestamp`/`@timestamp`/`time`/`ts`/`date` becomes the timestamp; `level`/`severity`, `message`/`msg`, `logger`/`source`, `status`, `path`/`url`, `durationMs` get semantic roles. Files may be `.json`, `.jsonl`, `.ndjson` or `.clef`. **Serilog JSON**: compact JSON (CLEF: `@t`, `@l`, `@mt`/`@m`, `@x`) becomes `level` (missing `@l` means Information), `message` (the template filled from the event's properties), `MessageTemplate`, `Exception`, `TraceId`/`SpanId`; the older `JsonFormatter`'s `Properties` are spread into their own columns and `RenderedMessage` is the message; `RequestPath`/`RequestMethod`/`StatusCode`/`Elapsed` from request logging get the URI/method/status/duration roles. |
+| **JSON document** | file starts with `[`, or with a `{` that isn't a complete one-line object | A single JSON array of entries (pretty-printed or not), an object wrapping one (`{"logs": [ … ]}`, `{"value": [ … ]}`: the first array of objects is used), or a lone object. Each entry is a row, handled as JSON lines above; "line" numbers count entries. The document is parsed in memory, so it is limited to 256 MB (save bigger exports as JSON lines). Text that turns out not to be valid JSON is read line by line instead. |
 | **Generic text** | fallback | Regex extracts a leading ISO-like timestamp, a level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL and common aliases like `WRN`, `Information`), an optional `[logger]`, and the message. Lines without a timestamp (stack traces) are appended to the previous entry. Covers **Serilog** file logs (`{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message}`): ASP.NET Core request lines (`HTTP GET /api/x responded 200 in 12.3 ms`, from `UseSerilogRequestLogging()`) also fill `RequestMethod`, `RequestPath`, `StatusCode` and `Elapsed (ms)`, so status filters, error rate, slow rows and the Endpoints view work. In such mixed logs a row is an error when its status is ≥ 400, or, for lines without a status, when its level is ERROR/FATAL. Lines with a **time but no date** are read too when a level follows the time (Serilog's console default `[11:54:02 INF] message`, also `11:54:02.120 WARN …`, leading spaces allowed): the date is the file's last-modified date (today for pasted text) and moves on a day when the clock goes back more than an hour (past midnight). The file bar then shows "Date assumed: …" so the guess is never silent. |
 
 ### Time zones
@@ -107,7 +109,7 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 
 ## Features
 
-- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
+- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.json`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
   rows parsed / lines skipped / detected format / parse time, metadata (`#`) lines, clear errors for wrong type,
   empty, binary or unparseable files. The file bar is one line by default (file, rows, format, time zone);
   *Details* shows size, parse time, metadata lines and where the time zone came from.

@@ -4,6 +4,7 @@ import { detectFormat, parseText, splitLines } from '../../src/parser';
 import { parseApacheTimestamp } from '../../src/parser/apache';
 import { buildLogIndex, isErrorRow } from '../../src/filters/logIndex';
 import { parseLooseIso } from '../../src/parser/generic';
+import { renderTemplate } from '../../src/parser/jsonl';
 
 const read = (name: string) => readFileSync(`fixtures/${name}`, 'utf8');
 
@@ -206,5 +207,59 @@ describe('time-only lines (Serilog console: "[HH:mm:ss INF] message")', () => {
 
   it('dated logs report no assumed date', () => {
     expect(parseText(read('sample-serilog.log')).timeZone.assumedDate).toBeUndefined();
+  });
+});
+
+describe('Serilog JSON', () => {
+  it('reads compact JSON (CLEF): time, level, rendered message, exception and request columns', () => {
+    const r = parseText(read('sample-serilog.clef'));
+    expect(r.format).toBe('jsonl');
+    expect(r.rows).toHaveLength(8);
+    expect(r.malformed).toHaveLength(0);
+    expect(r.timeZone.kind).toBe('utc');
+    const roles = Object.fromEntries(r.schema.filter((c) => c.role).map((c) => [c.role, c.key]));
+    expect(roles).toMatchObject({
+      timestamp: 'timestamp',
+      level: 'level',
+      message: 'message',
+      uri: 'RequestPath',
+      method: 'RequestMethod',
+      status: 'StatusCode',
+      duration: 'Elapsed',
+      logger: 'SourceContext',
+    });
+    expect(r.rows[0]!.ts).toBe(Date.UTC(2026, 2, 14, 5, 30, 1, 102));
+    expect(r.rows[0]!.values).toMatchObject({ level: 'Information', message: 'Now listening on: https://localhost:5001' });
+    expect(r.rows[1]!.values.message).toBe('HTTP GET /api/orders responded 200 in 142.3381 ms');
+    expect(r.rows[1]!.values.MessageTemplate).toBe(
+      'HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms',
+    );
+    const err = r.rows[5]!.values;
+    expect(err).toMatchObject({ level: 'Error', StatusCode: 500, TraceId: '4bf92f3577b34da6a3ce929d0e0e4736' });
+    expect(String(err.Exception)).toContain('SupplierClient.cs:line 41');
+    // The "@" keys themselves are not columns.
+    expect(r.schema.some((c) => c.key.startsWith('@'))).toBe(false);
+  });
+
+  it('flattens JsonFormatter "Properties" and uses RenderedMessage as the message', () => {
+    const line = JSON.stringify({
+      Timestamp: '2026-03-14T09:30:14.3100000+04:00',
+      Level: 'Error',
+      MessageTemplate: 'Failed for {Path}',
+      RenderedMessage: 'Failed for "/api/x"',
+      Exception: 'System.Exception: boom',
+      Properties: { Path: '/api/x', SourceContext: 'Demo.Api' },
+    });
+    const r = parseText(line);
+    expect(r.rows[0]!.values).toMatchObject({ Level: 'Error', Path: '/api/x', SourceContext: 'Demo.Api' });
+    expect(r.rows[0]!.values.Properties).toBeUndefined();
+    expect(r.schema.find((c) => c.role === 'message')!.key).toBe('RenderedMessage');
+    expect(r.timeZone).toMatchObject({ kind: 'offset', offsetMin: 240 });
+  });
+
+  it('renders message templates like Serilog', () => {
+    const props = { Name: 'Ann', Count: 3, Items: [1, 2] };
+    expect(renderTemplate('Hi {Name}, {Count:000} new {@Items} {$Name}', props)).toBe('Hi Ann, 3 new [1,2] Ann');
+    expect(renderTemplate('{{literal}} {Missing} {Name,10}', props)).toBe('{literal} {Missing} Ann');
   });
 });

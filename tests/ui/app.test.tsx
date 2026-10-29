@@ -287,6 +287,22 @@ describe('IP details', () => {
   });
 });
 
+describe('JSON files', () => {
+  it('opens a .json file holding a JSON array', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const events = [
+      { '@t': '2026-03-14T05:30:01Z', '@mt': 'Started {App}', App: 'demo' },
+      { '@t': '2026-03-14T05:30:02Z', '@mt': 'Failed', '@l': 'Error' },
+    ];
+    act(() => useLogStore.getState().loadFiles([new File([JSON.stringify(events, null, 2)], 'events.json')]));
+    await waitFor(() => expect(rowCount()).toBe('2 of 2 rows'));
+    expect(useLogStore.getState().error).toBeNull();
+    expect((screen.getByLabelText('Format') as HTMLSelectElement).selectedOptions[0]!.textContent).toContain('JSON');
+    expect(useLogStore.getState().rows.map((r) => r.values.message)).toEqual(['Started demo', 'Failed']);
+  });
+});
+
 describe('pasting text instead of a file', () => {
   it('parses text entered in the paste dialog', async () => {
     await loadSample();

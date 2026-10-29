@@ -45,8 +45,47 @@ export class ParseError extends Error {}
 export class CancelledError extends Error {}
 
 /** Accepted inside archives. */
-const LOG_NAME_RE = /\.(log|txt)$/i;
+const LOG_NAME_RE = /\.(log|txt|json|jsonl|ndjson|clef)$/i;
 const GZIP_RE = /\.gz$/i;
+
+/** A whole JSON document (not JSON lines) is parsed in memory, so it is capped. */
+export const MAX_JSON_DOCUMENT_CHARS = 256 * 1024 * 1024;
+
+/**
+ * Whether text is one JSON document ("[ {...}, ... ]", or a pretty-printed object) rather than
+ * lines: a leading "[", or a leading "{" whose first line is not a complete object. null = can't
+ * tell yet (first line not complete and more text may follow).
+ */
+export function isJsonDocument(text: string, final: boolean): boolean | null {
+  const i = text.search(/\S/);
+  if (i < 0) return final ? false : null;
+  if (text[i] === '[') return true;
+  if (text[i] !== '{') return false;
+  const nl = text.indexOf('\n', i);
+  if (nl < 0 && !final) return null;
+  try {
+    const first: unknown = JSON.parse(text.slice(i, nl < 0 ? undefined : nl));
+    return !(first !== null && typeof first === 'object' && !Array.isArray(first));
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The log entries in a parsed JSON document: the array itself, or the first array of objects
+ * found directly under an object ({"logs": [...]}, {"value": [...]}); otherwise the object alone.
+ */
+export function jsonDocumentRecords(doc: unknown): unknown[] {
+  if (Array.isArray(doc)) return doc;
+  if (doc !== null && typeof doc === 'object') {
+    for (const v of Object.values(doc)) {
+      if (Array.isArray(v) && v.length > 0 && v.every((x) => x !== null && typeof x === 'object' && !Array.isArray(x))) {
+        return v;
+      }
+    }
+  }
+  return [doc];
+}
 
 /** Natural order, so u_ex26102709.log sorts before u_ex26102710.log and file2 before file10. */
 export const compareNames = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -231,10 +270,9 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
       return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
     };
 
-    const feed = (complete: string) => {
-      const ls = complete.split('\n');
+    const feedLines = (ls: string[], guess: () => LogFormat) => {
       if (!parser) {
-        detected = detectFormat(ls.slice(0, 200));
+        detected = guess();
         format = opts.format ?? detected;
         parser = createParser(format);
         parser.setDefaultDate?.(input.modified);
@@ -249,27 +287,74 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
         if (++pending >= batchRows) emit(false);
       }
     };
+    const feed = (complete: string) => {
+      const ls = complete.split('\n');
+      feedLines(ls, () => detectFormat(ls.slice(0, 200)));
+    };
+    // A JSON document: each entry becomes one JSON line ("line" numbers count entries).
+    // Text that isn't valid JSON after all is read line by line instead.
+    const feedDocument = (text: string) => {
+      let doc: unknown;
+      try {
+        doc = JSON.parse(text);
+      } catch {
+        return feed(text);
+      }
+      feedLines(
+        jsonDocumentRecords(doc).map((r) => JSON.stringify(r) ?? 'null'),
+        () => 'jsonl',
+      );
+    };
+
+    // Decided from the first text: line-by-line (streamed) or one JSON document (read whole).
+    let documentMode: boolean | null = null;
+    const docParts: string[] = [];
+    let docChars = 0;
+    const addDocText = (t: string) => {
+      docParts.push(t);
+      docChars += t.length;
+      if (docChars > MAX_JSON_DOCUMENT_CHARS) {
+        throw new ParseError(
+          `"${input.name}" is a single JSON document larger than ${MAX_JSON_DOCUMENT_CHARS / 1024 / 1024} MB, ` +
+            'which is too big to open. Save it as JSON lines (one object per line) instead.',
+        );
+      }
+    };
 
     for await (const { bytes, consumed } of input.chunks()) {
       if (opts.isCancelled?.()) throw new CancelledError('Cancelled');
       bytesRead += consumed;
       const text = carry + checkStart(decoder.decode(bytes, { stream: true }));
-      const nl = text.lastIndexOf('\n');
-      if (nl < 0) {
+      carry = '';
+      if (documentMode === null) documentMode = isJsonDocument(text, false);
+      if (documentMode === null) {
         carry = text;
+      } else if (documentMode) {
+        addDocText(text);
       } else {
-        feed(text.slice(0, nl));
-        carry = text.slice(nl + 1);
-        sinceEmit += nl;
-        if (sinceEmit >= chunkBytes) {
-          emit(false);
-          sinceEmit = 0;
+        const nl = text.lastIndexOf('\n');
+        if (nl < 0) {
+          carry = text;
+        } else {
+          feed(text.slice(0, nl));
+          carry = text.slice(nl + 1);
+          sinceEmit += nl;
+          if (sinceEmit >= chunkBytes) {
+            emit(false);
+            sinceEmit = 0;
+          }
         }
       }
       progress(false);
     }
     const rest = carry + checkStart(decoder.decode());
-    if (started) feed(rest);
+    if (documentMode === null) documentMode = isJsonDocument(rest, true);
+    if (documentMode) {
+      addDocText(rest);
+      feedDocument(docParts.join(''));
+    } else if (started) {
+      feed(rest);
+    }
     emit(true);
     progress(true);
   }

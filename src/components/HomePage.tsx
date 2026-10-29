@@ -1,6 +1,6 @@
 import { DropZone } from './DropZone';
 
-const FORMATS = ['IIS W3C', 'Apache / Nginx', 'Serilog', 'JSON lines', 'Plain text', '.gz / .zip'];
+const FORMATS = ['IIS W3C', 'Apache / Nginx', 'Serilog', 'JSON / JSON lines', 'Plain text', '.gz / .zip'];
 
 const FEATURES = [
   {

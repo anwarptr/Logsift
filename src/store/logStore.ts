@@ -93,7 +93,7 @@ export interface LogState {
   setFileInfoExpanded(expanded: boolean): void;
 }
 
-export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.gz', '.zip'];
+export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.gz', '.zip'];
 
 /** Display name for text pasted instead of a file (also the base of export file names). */
 export const PASTED_NAME = 'pasted-text.txt';
@@ -132,7 +132,8 @@ export function defaultColumnWidth(col: ColumnDef): number {
   if (col.type === 'timestamp') return 190; // fits "2026-03-14 09:30:01.102"
   if (col.role === 'message') return 520;
   if (col.role === 'uri' || col.role === 'userAgent' || col.key === 'arrLogId') return 240;
-  if (col.role === 'status' || col.role === 'method' || col.role === 'level') return 76;
+  if (col.role === 'level') return 104; // fits Serilog's "Information"
+  if (col.role === 'status' || col.role === 'method') return 76;
   if (col.type === 'number') return 92;
   if (col.type === 'boolean') return 96;
   return 150;
@@ -284,8 +285,8 @@ export const useLogStore = create<LogState>()((set, get) => {
       if (ok.length === 0) {
         const f = all[0]!;
         let error: string;
-        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .gz or .zip files.';
-        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .gz or .zip file.`;
+        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .json, .gz or .zip files.';
+        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .json, .gz or .zip file.`;
         else error = `"${f.name}" is empty.`;
         set({ error });
         return;

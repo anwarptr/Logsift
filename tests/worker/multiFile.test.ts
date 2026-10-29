@@ -3,7 +3,7 @@ import { crc32, deflateRawSync, gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { parseText, type LogRow } from '../../src/parser';
 import { mergeByTime } from '../../src/store/logStore';
-import { ParseError, streamParseSources, type LogSource, type StreamBatch } from '../../src/worker/streamParse';
+import { isJsonDocument, ParseError, streamParseSources, type LogSource, type StreamBatch } from '../../src/worker/streamParse';
 
 const sample = readFileSync('fixtures/sample-iis.log', 'utf8');
 
@@ -174,5 +174,60 @@ describe('time-only logs', () => {
       Date.UTC(2026, 9, 28, 8, 0, 0),
     ]);
     expect(summary.timeZone.assumedDate).toBe('2026-10-27 – 2026-10-28');
+  });
+});
+
+describe('JSON files', () => {
+  const events = [
+    { time: '2026-03-14T09:30:01Z', level: 'info', msg: 'started' },
+    { time: '2026-03-14T09:30:02Z', level: 'error', msg: 'failed', status: 500 },
+    { time: '2026-03-14T09:30:03Z', level: 'info', msg: 'done' },
+  ];
+  const src = (name: string, text: string): LogSource => ({ name, blob: new Blob([text]) });
+
+  it('reads a pretty-printed JSON array as one row per entry, even across chunk boundaries', async () => {
+    const { summary, rows, malformed } = await run([src('events.json', JSON.stringify(events, null, 2))], 16);
+    expect(summary.format).toBe('jsonl');
+    expect(malformed).toHaveLength(0);
+    expect(rows.map((r) => r.values.msg)).toEqual(['started', 'failed', 'done']);
+    expect(rows[1]!.ts).toBe(Date.UTC(2026, 2, 14, 9, 30, 2));
+    expect(rows.map((r) => r.lineNo)).toEqual([1, 2, 3]); // entry numbers
+  });
+
+  it('finds the array inside a wrapper object, and reads a lone object as one row', async () => {
+    const wrapped = await run([src('export.json', JSON.stringify({ count: 3, logs: events }, null, 2))]);
+    expect(wrapped.rows.map((r) => r.values.msg)).toEqual(['started', 'failed', 'done']);
+    const single = await run([src('one.json', JSON.stringify(events[0], null, 2))]);
+    expect(single.rows).toHaveLength(1);
+    expect(single.rows[0]!.values.msg).toBe('started');
+  });
+
+  it('still streams JSON lines saved as .json', async () => {
+    const { rows, summary } = await run([src('events.json', events.map((e) => JSON.stringify(e)).join('\n'))]);
+    expect(summary.format).toBe('jsonl');
+    expect(rows.map((r) => r.lineNo)).toEqual([1, 2, 3]);
+  });
+
+  it('falls back to line-by-line reading when a document is not valid JSON', async () => {
+    const { rows, malformed } = await run([src('broken.json', '[\n{"msg": "a"},\n{"msg": oops}\n')]);
+    expect(rows).toHaveLength(0);
+    expect(malformed.length).toBeGreaterThan(0);
+  });
+
+  it('opens .json entries inside a .zip', async () => {
+    const zip = makeZip([{ name: 'logs/events.json', data: JSON.stringify(events), deflate: true }]);
+    const { rows } = await run([{ name: 'logs.zip', blob: zip }]);
+    expect(rows).toHaveLength(3);
+  });
+
+  it.each([
+    ['[\n  {"a": 1}\n]', true, true],
+    ['{\n  "logs": []\n}', true, true],
+    ['{"a": 1}\n{"a": 2}', true, false],
+    ['2026-03-14 09:30:01 INFO hi', true, false],
+    ['{"a": 1', false, null],
+    ['   ', true, false],
+  ])('isJsonDocument(%j)', (text, final, expected) => {
+    expect(isJsonDocument(text, final)).toBe(expected);
   });
 });
