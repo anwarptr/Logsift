@@ -175,7 +175,13 @@ describe('time zone', () => {
   it('shows the detected zone and switches between log and local time', async () => {
     await loadSample();
     const info = screen.getByLabelText('File information');
+    // The compact file bar keeps the zone and switch; the explanation is under Details.
+    expect(info.textContent).not.toContain('IIS logs are always UTC');
+    fireEvent.click(within(info).getByRole('button', { name: /Details/ }));
     expect(info.textContent).toContain('IIS logs are always UTC');
+    expect(info.textContent).toContain('Size');
+    fireEvent.click(within(info).getByRole('button', { name: /Less/ }));
+    expect(info.textContent).not.toContain('Size');
     const sidebar = screen.getByLabelText('Filters');
     expect(sidebar.textContent).toContain('Time range (UTC)');
     expect(sidebar.textContent).toContain('File spans 2026-03-14 09:12:02 – 2026-03-14 09:13:32');
@@ -190,6 +196,54 @@ describe('time zone', () => {
 
     fireEvent.click(within(group).getByRole('radio', { name: 'Log time (UTC)' }));
     expect(sidebar.textContent).toContain('File spans 2026-03-14 09:12:02');
+  });
+});
+
+describe('more room for the table', () => {
+  it('hides and shows the filter panel from the panel, the rail and the [ key', async () => {
+    await loadSample();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide filters' }));
+    expect(screen.queryByLabelText('Filters')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('log-viewer:prefs')!).sidebarOpen).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(screen.getByLabelText('Filters')).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: '[' });
+    expect(screen.queryByLabelText('Filters')).toBeNull();
+    fireEvent.keyDown(window, { key: '[' });
+    expect(screen.getByLabelText('Filters')).toBeTruthy();
+  });
+
+  it('focus mode leaves only the table, toolbar and filter chips', async () => {
+    await loadSample();
+    const focus = screen.getByRole('button', { name: 'Focus' });
+    fireEvent.click(screen.getByRole('switch', { name: 'Hide health checks' }));
+    fireEvent.click(focus);
+    expect(focus.getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('.app')!.classList.contains('focus-mode')).toBe(true);
+    expect(screen.queryByLabelText('File information')).toBeNull();
+    expect(screen.queryByLabelText('Filters')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show filters' })).toBeNull();
+    expect(screen.queryByLabelText('Insights')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove filter No health checks' })).toBeTruthy();
+    expect(rowCount()).toBe('10 of 16 rows');
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('File information')).toBeTruthy();
+    expect(screen.getByLabelText('Filters')).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: 'f' });
+    expect(screen.queryByLabelText('File information')).toBeNull();
+    // Typing an "f" in the search box must not toggle it.
+    const search = screen.getByRole('searchbox');
+    search.focus();
+    fireEvent.keyDown(search, { key: 'f' });
+    expect(screen.queryByLabelText('File information')).toBeNull();
+    search.blur();
+    fireEvent.keyDown(window, { key: 'f' });
+    expect(screen.getByLabelText('File information')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
   });
 });
 

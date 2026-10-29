@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { DropZone, ParseProgress } from './components/DropZone';
 import { EndpointsTable } from './components/EndpointsTable';
 import { FileInfo } from './components/FileInfo';
@@ -16,9 +15,6 @@ import { useLogStore } from './store/logStore';
 import { useDisplayIndices, useSearchHighlight, useVisibleColumns } from './store/useView';
 import { useShortcuts } from './utils/useShortcuts';
 
-const NARROW = '(max-width: 900px)';
-const isNarrow = () => typeof window !== 'undefined' && window.matchMedia?.(NARROW).matches;
-
 export default function App() {
   const status = useLogStore((s) => s.status);
   const error = useLogStore((s) => s.error);
@@ -30,15 +26,19 @@ export default function App() {
   const columns = useVisibleColumns();
   const indices = useDisplayIndices();
   const highlight = useSearchHighlight();
-  const [sidebarOpen, setSidebarOpen] = useState(() => !isNarrow());
+  const sidebarOpen = useLogStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useLogStore((s) => s.setSidebarOpen);
   const insightsOpen = useLogStore((s) => s.insightsOpen);
   const setInsightsOpen = useLogStore((s) => s.setInsightsOpen);
+  // Focus mode only makes sense with data on screen.
+  const focus = useLogStore((s) => s.focusMode) && hasData;
 
   useUrlSync();
   useShortcuts();
 
   return (
-    <div className="app">
+    <div className={'app' + (focus ? ' focus-mode' : '')}>
+      {/* Hidden by CSS in focus mode rather than unmounted: its DropZone owns the window-wide drop/paste handlers. */}
       <header className="app-header">
         <h1 className="app-title">Log Viewer</h1>
         <div className="header-actions">
@@ -48,6 +48,7 @@ export default function App() {
               className="btn small"
               aria-pressed={sidebarOpen}
               aria-controls="filter-sidebar"
+              title="Show or hide the filter panel ( [ )"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               Filters
@@ -68,42 +69,64 @@ export default function App() {
       {status === 'loading' && <ParseProgress />}
       {hasData ? (
         <main className="app-main">
-          <FileInfo />
+          {!focus && <FileInfo />}
           <div className="workspace">
-            {sidebarOpen && (
-              <div id="filter-sidebar" className="sidebar-wrap">
+            {!focus &&
+              (sidebarOpen ? (
+                <div id="filter-sidebar" className="sidebar-wrap">
+                  <div className="sidebar-head">
+                    <span>Filters</span>
+                    <button
+                      type="button"
+                      className="btn small ghost"
+                      aria-label="Hide filters"
+                      title="Hide filters ( [ )"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <span aria-hidden="true">«</span>
+                    </button>
+                  </div>
+                  <FilterSidebar />
+                </div>
+              ) : (
                 <button
                   type="button"
-                  className="btn small ghost sidebar-close"
-                  aria-label="Close filters"
-                  onClick={() => setSidebarOpen(false)}
+                  className="sidebar-rail"
+                  aria-label="Show filters"
+                  aria-controls="filter-sidebar"
+                  aria-expanded={false}
+                  title="Show filters ( [ )"
+                  onClick={() => setSidebarOpen(true)}
                 >
-                  ✕
+                  <span aria-hidden="true">»</span>
+                  <span className="sidebar-rail-label" aria-hidden="true">
+                    Filters
+                  </span>
                 </button>
-                <FilterSidebar />
-              </div>
-            )}
+              ))}
             <section className="table-area" aria-label="Log table">
               <TableToolbar>
                 <SearchBox />
               </TableToolbar>
               <FilterChips />
-              <section className={'insights-wrap' + (insightsOpen ? ' open' : '')} aria-label="Insights">
-                <button
-                  type="button"
-                  className="insights-toggle"
-                  aria-expanded={insightsOpen}
-                  aria-controls="insights-body"
-                  onClick={() => setInsightsOpen(!insightsOpen)}
-                >
-                  <span aria-hidden="true">{insightsOpen ? '▾' : '▸'}</span> Insights
-                </button>
-                {insightsOpen && (
-                  <div id="insights-body">
-                    <InsightsPanel />
-                  </div>
-                )}
-              </section>
+              {!focus && (
+                <section className={'insights-wrap' + (insightsOpen ? ' open' : '')} aria-label="Insights">
+                  <button
+                    type="button"
+                    className="insights-toggle"
+                    aria-expanded={insightsOpen}
+                    aria-controls="insights-body"
+                    onClick={() => setInsightsOpen(!insightsOpen)}
+                  >
+                    <span aria-hidden="true">{insightsOpen ? '▾' : '▸'}</span> Insights
+                  </button>
+                  {insightsOpen && (
+                    <div id="insights-body">
+                      <InsightsPanel />
+                    </div>
+                  )}
+                </section>
+              )}
               {tab === 'rows' ? (
                 <div role="tabpanel" id="panel-rows" aria-labelledby="tab-rows" className="tab-panel">
                   <LogTable rows={rows} indices={indices} columns={columns} highlight={highlight} />

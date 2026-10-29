@@ -15,6 +15,8 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
   const setSlow = useLogStore((s) => s.setSlowThreshold);
   const hasDuration = useLogStore((s) => s.schema.some((c) => c.role === 'duration'));
   const hasUri = useLogStore((s) => s.schema.some((c) => c.role === 'uri'));
+  const focusMode = useLogStore((s) => s.focusMode);
+  const setFocusMode = useLogStore((s) => s.setFocusMode);
 
   return (
     <div className="table-toolbar">
@@ -82,6 +84,15 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
         </button>
         <ColumnChooser />
         {tab === 'rows' && <ExportMenu />}
+        <button
+          type="button"
+          className="btn small"
+          aria-pressed={focusMode}
+          title={focusMode ? 'Show the header, file bar, filters and insights again (F or Esc)' : 'Give the table the whole window (F)'}
+          onClick={() => setFocusMode(!focusMode)}
+        >
+          <span aria-hidden="true">{focusMode ? '⤡' : '⤢'}</span> Focus
+        </button>
       </div>
     </div>
   );

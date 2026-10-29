@@ -9,10 +9,22 @@ export interface Prefs {
   slowThresholdMs: number;
   insightsOpen: boolean;
   timeDisplay: TimeDisplay;
+  /** Filter panel shown on wide screens (narrow screens always start with it closed). */
+  sidebarOpen: boolean;
+  /** File bar shows size, parse time, metadata etc. instead of just the essentials. */
+  fileInfoExpanded: boolean;
 }
 
 const KEY = 'log-viewer:prefs';
-const DEFAULTS: Prefs = { density: 'compact', theme: 'system', slowThresholdMs: 1000, insightsOpen: true, timeDisplay: 'log' };
+const DEFAULTS: Prefs = {
+  density: 'compact',
+  theme: 'system',
+  slowThresholdMs: 1000,
+  insightsOpen: true,
+  timeDisplay: 'log',
+  sidebarOpen: true,
+  fileInfoExpanded: false,
+};
 
 /** Per-browser UI preferences. Storage may be unavailable (private mode), so every access is guarded. */
 export function loadPrefs(): Prefs {
@@ -27,6 +39,8 @@ export function loadPrefs(): Prefs {
         typeof p.slowThresholdMs === 'number' && p.slowThresholdMs >= 0 ? p.slowThresholdMs : DEFAULTS.slowThresholdMs,
       insightsOpen: p.insightsOpen !== false,
       timeDisplay: p.timeDisplay === 'local' ? 'local' : 'log',
+      sidebarOpen: p.sidebarOpen !== false,
+      fileInfoExpanded: p.fileInfoExpanded === true,
     };
   } catch {
     return { ...DEFAULTS };

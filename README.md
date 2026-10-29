@@ -108,7 +108,12 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 
 - **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
   rows parsed / lines skipped / detected format / parse time, metadata (`#`) lines, clear errors for wrong type,
-  empty, binary or unparseable files.
+  empty, binary or unparseable files. The file bar is one line by default (file, rows, format, time zone);
+  *Details* shows size, parse time, metadata lines and where the time zone came from.
+- **More room for the table**: hide the filter panel with `«` (a slim *Filters* strip on the left brings it back,
+  and the choice is remembered), or press **Focus** (`F`) to hide the header, file bar, filter panel and insights
+  so the table fills the window; active filters stay visible as chips. Short tables end after their last row
+  instead of stretching to the bottom of the window.
 - **Table**: virtualized (tested to stay smooth at 500k rows), sticky header, click-to-sort (asc → desc → off),
   resizable columns (drag a header edge, double-click resets), column chooser with show/hide and drag-to-reorder
   (↑/↓ buttons for keyboard users), status colours (2xx green, 3xx blue, 4xx amber, 5xx red), level colours,
@@ -129,7 +134,8 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   as ↗ in the IP filter list and Top client IPs. IPv4, IPv6, `[v6]:port` and `v4:port` are recognised.
 - **Export** the filtered rows in the current sort order to CSV (visible columns) or JSON (all fields + line number).
 - **Theme**: follows the system by default; toggle cycles system → light → dark (remembered per browser).
-- **Shortcuts**: `/` focuses search, `Esc` closes the detail panel / clears the selection (and blurs search),
+- **Shortcuts**: `/` focuses search, `[` shows/hides the filter panel, `F` toggles focus mode, `Esc` closes the
+  detail panel / clears the selection, then blurs search, then leaves focus mode,
   arrow keys / PageUp / PageDown / Home / End move through rows, Enter or Space opens a row.
 - **Responsive & accessible**: sidebar and detail panel become overlays below 900 px; labelled controls, visible
   focus states, ARIA grid with `aria-activedescendant`, tablist for Rows/Malformed, live row count.
@@ -233,7 +239,7 @@ once per distinct URI while building the index). Numbers vary by machine; the te
   `pasted-text-filtered.csv/json`. Ctrl+V outside a text field loads the clipboard immediately (a copied file is
   opened as a file); the **Paste text…** dialog lets you review or edit the text first (Ctrl+Enter parses).
   Pasting replaces the current data, like opening a new file.
-- **Preferences** (theme, density, slow threshold, insights open) live in `localStorage`; failures are ignored.
+- **Preferences** (theme, density, slow threshold, insights open, filter panel open, file bar details) live in `localStorage`; failures are ignored.
 
 ## Known limitations
 

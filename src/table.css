@@ -37,6 +37,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* Space below a short table shows the page background, not an empty white table. */
+  background: var(--bg);
 }
 .table-toolbar {
   display: flex;
@@ -97,13 +99,17 @@
 }
 
 /* ---------- Table ---------- */
+/* Sized to its rows (so the horizontal scrollbar sits right under the last row), up to the
+   available height, where it scrolls. */
 .table-scroll {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
   position: relative;
   font-size: 12.5px;
-  contain: strict;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  contain: layout paint;
 }
 .table-scroll:focus-visible {
   outline-offset: -2px;
@@ -493,9 +499,11 @@ mark {
   margin: 0;
 }
 .endpoints-scroll {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 .endpoints-table {
   width: 100%;

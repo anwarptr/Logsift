@@ -55,6 +55,10 @@ export interface LogState {
   slowThresholdMs: number;
   insightsOpen: boolean;
   timeDisplay: TimeDisplay;
+  sidebarOpen: boolean;
+  /** Table fills the window: header, file bar, filter panel and insights are hidden. */
+  focusMode: boolean;
+  fileInfoExpanded: boolean;
 
   // --- filters ---
   filters: FilterState;
@@ -84,6 +88,9 @@ export interface LogState {
   setSlowThreshold(ms: number): void;
   setInsightsOpen(open: boolean): void;
   setTimeDisplay(d: TimeDisplay): void;
+  setSidebarOpen(open: boolean): void;
+  setFocusMode(on: boolean): void;
+  setFileInfoExpanded(expanded: boolean): void;
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.gz', '.zip'];
@@ -132,6 +139,9 @@ export function defaultColumnWidth(col: ColumnDef): number {
 }
 
 export const MIN_COLUMN_WIDTH = 44;
+
+/** Matches the CSS breakpoint where the filter panel becomes an overlay. */
+export const isNarrowScreen = () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 900px)').matches;
 
 const prefs = loadPrefs();
 const initialFilters = typeof location === 'undefined' ? EMPTY_FILTERS : parseFilters(location.hash);
@@ -244,6 +254,9 @@ export const useLogStore = create<LogState>()((set, get) => {
     slowThresholdMs: prefs.slowThresholdMs,
     insightsOpen: prefs.insightsOpen,
     timeDisplay: prefs.timeDisplay,
+    sidebarOpen: prefs.sidebarOpen && !isNarrowScreen(),
+    focusMode: false,
+    fileInfoExpanded: prefs.fileInfoExpanded,
 
     filters: initialFilters,
     keepFiltersOnLoad: hasActiveFilters(initialFilters),
@@ -373,6 +386,21 @@ export const useLogStore = create<LogState>()((set, get) => {
     setTimeDisplay(timeDisplay) {
       set({ timeDisplay });
       savePrefs({ timeDisplay });
+    },
+
+    setSidebarOpen(sidebarOpen) {
+      set({ sidebarOpen });
+      // On narrow screens the panel is a temporary overlay; don't let closing it hide it on desktop.
+      if (!isNarrowScreen()) savePrefs({ sidebarOpen });
+    },
+
+    setFocusMode(focusMode) {
+      set({ focusMode });
+    },
+
+    setFileInfoExpanded(fileInfoExpanded) {
+      set({ fileInfoExpanded });
+      savePrefs({ fileInfoExpanded });
     },
 
     setSlowThreshold(ms) {

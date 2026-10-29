@@ -1,7 +1,3 @@
-.sidebar-close {
-  display: none;
-}
-
 @media (max-width: 900px) {
   .workspace {
     position: relative;
@@ -13,10 +9,6 @@
     z-index: 30;
     width: min(320px, 88vw);
     box-shadow: var(--shadow);
-  }
-  .sidebar-close {
-    display: block;
-    margin: 6px 8px 0 auto;
   }
   .detail-panel {
     position: absolute;

@@ -20,7 +20,7 @@ function zoneText(tz: LogTimeZone): string {
 }
 
 /** The log's detected zone, plus a log/local switch when local time differs from it. */
-function TimeZoneInfo({ tz }: { tz: LogTimeZone }) {
+function TimeZoneInfo({ tz, expanded }: { tz: LogTimeZone; expanded: boolean }) {
   const index = useLogIndex();
   const display = useLogStore((s) => s.timeDisplay);
   const setDisplay = useLogStore((s) => s.setTimeDisplay);
@@ -36,7 +36,9 @@ function TimeZoneInfo({ tz }: { tz: LogTimeZone }) {
       <dt>Time zone</dt>
       <dd className="tz-info">
         <span title={tz.source}>{zoneText(tz)}</span>
-        {tz.kind !== 'mixed' && tz.kind !== 'unspecified' && <span className="muted tz-source">{tz.source}</span>}
+        {expanded && tz.kind !== 'mixed' && tz.kind !== 'unspecified' && (
+          <span className="muted tz-source">{tz.source}</span>
+        )}
         {differs ? (
           <span className="tz-switch" role="radiogroup" aria-label="Show times in">
             <button
@@ -59,7 +61,7 @@ function TimeZoneInfo({ tz }: { tz: LogTimeZone }) {
             </button>
           </span>
         ) : (
-          index && <span className="muted tz-source">same as your local time</span>
+          expanded && index && <span className="muted tz-source">same as your local time</span>
         )}
       </dd>
     </div>
@@ -79,11 +81,14 @@ export function FileInfo() {
   const status = useLogStore((s) => s.status);
   const tz = useLogStore((s) => s.logTimeZone);
   const files = useLogStore((s) => s.files);
+  const expanded = useLogStore((s) => s.fileInfoExpanded);
+  const setExpanded = useLogStore((s) => s.setFileInfoExpanded);
 
   if (!file) return null;
 
+  // Compact: one line with what you act on (file, rows, format, time zone); "Details" adds the rest.
   return (
-    <section className="file-info" aria-label="File information">
+    <section className={'file-info' + (expanded ? '' : ' compact')} aria-label="File information">
       <dl className="file-info-grid">
         <div>
           <dt>File</dt>
@@ -91,19 +96,23 @@ export function FileInfo() {
             {file.name}
           </dd>
         </div>
-        <div>
-          <dt>Size</dt>
-          <dd>{formatBytes(file.size)}</dd>
-        </div>
+        {expanded && (
+          <div>
+            <dt>Size</dt>
+            <dd>{formatBytes(file.size)}</dd>
+          </div>
+        )}
         <div>
           <dt>Parsed</dt>
           <dd>{formatNumber(rowCount)}</dd>
         </div>
-        <div>
-          <dt>Skipped</dt>
-          <dd className={malformedCount ? 'warn-text' : undefined}>{formatNumber(malformedCount)}</dd>
-        </div>
-        {parseMs !== null && (
+        {(expanded || malformedCount > 0) && (
+          <div>
+            <dt>Skipped</dt>
+            <dd className={malformedCount ? 'warn-text' : undefined}>{formatNumber(malformedCount)}</dd>
+          </div>
+        )}
+        {expanded && parseMs !== null && (
           <div>
             <dt>Parse time</dt>
             <dd>{formatDuration(parseMs)}</dd>
@@ -130,7 +139,7 @@ export function FileInfo() {
             {format && override === 'auto' && <span className="visually-hidden">Detected {FORMAT_LABELS[format]}</span>}
           </dd>
         </div>
-        {tz && <TimeZoneInfo tz={tz} />}
+        {tz && <TimeZoneInfo tz={tz} expanded={expanded} />}
       </dl>
       {(files.length > 1 || (files.length === 1 && files[0] !== file.name)) && (
         <details className="file-meta">
@@ -147,13 +156,21 @@ export function FileInfo() {
           </ul>
         </details>
       )}
-      {meta.length > 0 && (
+      {expanded && meta.length > 0 && (
         <details className="file-meta">
           <summary>{meta.length} metadata lines</summary>
           <pre>{meta.slice(0, 200).join('\n')}</pre>
           {meta.length > 200 && <p className="muted">…and {formatNumber(meta.length - 200)} more</p>}
         </details>
       )}
+      <button
+        type="button"
+        className="btn small ghost file-info-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? 'Less' : 'Details'} <span aria-hidden="true">{expanded ? '▴' : '▾'}</span>
+      </button>
     </section>
   );
 }
