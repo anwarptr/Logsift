@@ -2,7 +2,7 @@ import type { LogTimeZone } from './timezone';
 
 export type { LogTimeZone } from './timezone';
 
-export type LogFormat = 'iis' | 'freb' | 'winevent' | 'apache' | 'jsonl' | 'generic';
+export type LogFormat = 'iis' | 'freb' | 'winevent' | 'apache' | 'jsonl' | 'syslog' | 'generic';
 
 export const FORMAT_LABELS: Record<LogFormat, string> = {
   iis: 'IIS W3C Extended',
@@ -10,6 +10,7 @@ export const FORMAT_LABELS: Record<LogFormat, string> = {
   winevent: 'Windows Event Log (XML)',
   apache: 'Apache/Nginx combined',
   jsonl: 'JSON lines',
+  syslog: 'Syslog',
   generic: 'Generic text',
 };
 

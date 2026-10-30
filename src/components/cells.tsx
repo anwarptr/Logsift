@@ -17,6 +17,9 @@ export function levelClass(v: CellValue): string {
   switch (v.toUpperCase()) {
     case 'FATAL':
     case 'CRITICAL':
+    case 'CRIT':
+    case 'EMERG':
+    case 'ALERT':
       return 'lv-fatal';
     case 'ERROR':
     case 'ERR':
@@ -26,6 +29,7 @@ export function levelClass(v: CellValue): string {
       return 'lv-warn';
     case 'INFO':
     case 'INFORMATION':
+    case 'NOTICE':
       return 'lv-info';
     case 'DEBUG':
     case 'TRACE':

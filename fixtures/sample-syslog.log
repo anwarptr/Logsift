@@ -1,0 +1,8 @@
+Mar 14 09:30:01 web01 systemd[1]: Started Shop API service.
+Mar 14 09:30:02 web01 shop-api[4242]: Listening on http://0.0.0.0:5000
+<11>Mar 14 09:30:05 web01 shop-api[4242]: Unhandled exception: connection refused
+    at Db.Connect (db.js:42)
+    at Startup.Run (startup.js:7)
+<85>Mar 14 09:30:06 web01 sudo: deploy : TTY=pts/0 ; PWD=/srv/shop ; COMMAND=/bin/systemctl restart shop-api
+Mar 14 09:31:00 web01 kernel: [ 1234.567890] eth0: link up
+<28>Mar  4 09:31:10 web01 nginx[88]: upstream timed out (110: Connection timed out)

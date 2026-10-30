@@ -1,4 +1,5 @@
 import { APACHE_LINE_RE } from './apache';
+import { isSyslogLine } from './syslog';
 import type { LogFormat } from './types';
 
 const SAMPLE_SIZE = 50;
@@ -37,6 +38,7 @@ export function detectFormat(lines: readonly string[]): LogFormat {
   const ratio = (pred: (l: string) => boolean) => sample.filter(pred).length / sample.length;
   if (ratio((l) => APACHE_LINE_RE.test(l)) >= MATCH_RATIO) return 'apache';
   if (ratio(isJsonObject) >= MATCH_RATIO) return 'jsonl';
+  if (ratio(isSyslogLine) >= MATCH_RATIO) return 'syslog';
   // IIS data without headers is not supported; everything else falls back to generic text.
   return 'generic';
 }

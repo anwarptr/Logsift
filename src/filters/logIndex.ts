@@ -184,7 +184,7 @@ export function buildLogIndex(rows: readonly LogRow[], schema: ColumnDef[]): Log
       if (scmCol && v[scmCol.key] === true) f |= FLAG_SCM;
       if (levelCol) {
         const lv = v[levelCol.key];
-        if (typeof lv === 'string' && /^(error|err|fatal|critical|crit)$/i.test(lv)) f |= FLAG_ERROR_LEVEL;
+        if (typeof lv === 'string' && /^(error|err|fatal|critical|crit|emerg|emergency|alert)$/i.test(lv)) f |= FLAG_ERROR_LEVEL;
       }
       flags[i] = f;
     }
