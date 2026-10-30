@@ -478,6 +478,23 @@ mark {
   background: var(--accent-soft);
   text-decoration: none;
 }
+/* "Only this" in row details: a text link that filters to the field's value. */
+.only-this {
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.only-this:hover {
+  text-decoration: underline;
+}
 
 /* Endpoints view */
 .endpoints {

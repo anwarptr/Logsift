@@ -125,6 +125,9 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   (↑/↓ buttons for keyboard users), status colours (2xx green, 3xx blue, 4xx amber, 5xx red), level colours,
   slow-row highlight (threshold editable, default 1000 ms), compact/comfortable density, search-match highlighting.
   Click a row (or arrow keys + Enter) to open the detail panel with all fields, **Copy as JSON** and **Copy raw line**.
+  Fields that have a filter get an **Only this** link (show only rows with that value: any facet column, or the
+  exact URI). With filters on, **Show in full log** clears them for the moment and shows the row among its
+  neighbours in file order; a note above the table offers **Restore filters** (changing any filter also ends it).
 - **Endpoints** tab: requests grouped by URI pattern — lower-cased, trailing `/` dropped, and variable segments
   replaced (numbers → `{id}`, GUIDs → `{guid}`, dates → `{date}`, long hex → `{hash}`, long opaque tokens →
   `{token}`), so `/api/Products/123` and `/api/products/456/` are both `/api/products/{id}`. Per endpoint: methods,
@@ -142,7 +145,8 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 - **Theme**: follows the system by default; toggle cycles system → light → dark (remembered per browser).
 - **Shortcuts**: `/` focuses search, `[` shows/hides the filter panel, `F` toggles focus mode, `Esc` closes the
   detail panel / clears the selection, then blurs search, then leaves focus mode,
-  arrow keys / PageUp / PageDown / Home / End move through rows, Enter or Space opens a row.
+  arrow keys / PageUp / PageDown / Home / End move through rows, Enter or Space opens a row, `n` / `Shift+N` jump to
+  the next / previous error row.
 - **Responsive & accessible**: sidebar and detail panel become overlays below 900 px; labelled controls, visible
   focus states, ARIA grid with `aria-activedescendant`, tablist for Rows/Malformed, live row count.
 

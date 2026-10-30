@@ -350,3 +350,66 @@ describe('pasting text instead of a file', () => {
     act(() => useLogStore.getState().setError(null));
   });
 });
+
+describe('row details shortcuts', () => {
+  it('"Only this" filters to a facet value or an exact URI', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const { rows } = useLogStore.getState();
+    const row = rows[0]!;
+    act(() => useLogStore.getState().select(row.id));
+    const details = () => screen.getByRole('complementary', { name: `Details for line ${row.lineNo}` });
+
+    fireEvent.click(within(details()).getByTitle('Show only rows with this c-ip'));
+    const sameIp = rows.filter((r) => r.values['c-ip'] === row.values['c-ip']).length;
+    expect(rowCount()).toBe(`${sameIp} of 16 rows`);
+    expect(screen.getByRole('button', { name: `Remove filter c-ip: ${String(row.values['c-ip'])}` })).toBeTruthy();
+
+    fireEvent.click(within(details()).getByTitle('Show only rows with this cs-uri-stem'));
+    expect(useLogStore.getState().filters).toMatchObject({ uriMode: 'equals', uri: row.values['cs-uri-stem'] });
+    // Free-text and time fields have no such button.
+    expect(within(details()).queryByTitle('Show only rows with this timestamp')).toBeNull();
+    act(() => useLogStore.getState().clearFilters());
+    act(() => useLogStore.getState().select(null));
+  });
+
+  it('"Show in full log" sets the filters aside until they are restored', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    fireEvent.click(screen.getByRole('switch', { name: /Only errors/ }));
+    expect(rowCount()).toBe('13 of 16 rows');
+    const errorRow = useLogStore.getState().rows.find((r) => Number(r.values['sc-status']) >= 400)!;
+    act(() => useLogStore.getState().select(errorRow.id));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show in full log' }));
+    expect(rowCount()).toBe('16 of 16 rows');
+    expect(useLogStore.getState().selectedId).toBe(errorRow.id);
+    expect(screen.getByText(new RegExp(`Filters paused to show line ${errorRow.lineNo}`))).toBeTruthy();
+    // Nothing to set aside any more, so the button is gone.
+    expect(screen.queryByRole('button', { name: 'Show in full log' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore filters' }));
+    expect(rowCount()).toBe('13 of 16 rows');
+    expect(screen.queryByText(/Filters paused/)).toBeNull();
+    act(() => useLogStore.getState().clearFilters());
+    act(() => useLogStore.getState().select(null));
+  });
+
+  it('n and Shift+N step through error rows', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const { rows } = useLogStore.getState();
+    const errors = rows.filter((r) => Number(r.values['sc-status']) >= 400).map((r) => r.id);
+    act(() => useLogStore.getState().select(null));
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(useLogStore.getState().selectedId).toBe(errors[0]);
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(useLogStore.getState().selectedId).toBe(errors[1]);
+    fireEvent.keyDown(window, { key: 'N', shiftKey: true });
+    expect(useLogStore.getState().selectedId).toBe(errors[0]);
+    // Wraps around backwards from the first error to the last.
+    fireEvent.keyDown(window, { key: 'N', shiftKey: true });
+    expect(useLogStore.getState().selectedId).toBe(errors.at(-1));
+    act(() => useLogStore.getState().select(null));
+  });
+});

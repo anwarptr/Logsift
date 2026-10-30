@@ -64,6 +64,8 @@ export function FilterChips() {
   const total = useLogStore((s) => s.rows.length);
   const matched = useMatchedIndices().length;
   const zone = useDisplayZone();
+  const paused = useLogStore((s) => s.paused);
+  const restore = useLogStore((s) => s.restoreFilters);
   const chips = buildChips(filters, slowMs, zone);
 
   return (
@@ -81,6 +83,14 @@ export function FilterChips() {
           </button>
         </span>
       ))}
+      {paused && (
+        <span className="paused-note">
+          Filters paused to show line {formatNumber(paused.lineNo)} in the full log.{' '}
+          <button type="button" className="btn small" onClick={restore}>
+            Restore filters
+          </button>
+        </span>
+      )}
       {chips.length > 0 && (
         <button type="button" className="btn small ghost" onClick={() => clear()} disabled={filters === EMPTY_FILTERS}>
           Clear all

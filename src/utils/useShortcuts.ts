@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { isErrorRow, type LogIndex } from '../filters/logIndex';
 import { useLogStore } from '../store/logStore';
 
 export function isEditable(el: Element | null): boolean {
@@ -8,10 +9,29 @@ export function isEditable(el: Element | null): boolean {
 }
 
 /**
- * Global shortcuts: "/" focuses search, "[" shows/hides the filter panel, "F" toggles focus mode,
- * "Esc" closes the detail panel, then leaves the search box, then leaves focus mode.
+ * The next (dir 1) or previous (dir -1) error row after the selected one, in display order,
+ * wrapping around; from the top (or bottom) when nothing is selected. null when there are no errors.
  */
-export function useShortcuts(): void {
+export function nextErrorRow(indices: Uint32Array, index: LogIndex, selectedId: number | null, dir: 1 | -1): number | null {
+  const n = indices.length;
+  if (n === 0) return null;
+  const pos = selectedId === null ? -1 : indices.indexOf(selectedId);
+  const start = pos < 0 ? (dir === 1 ? -1 : n) : pos;
+  for (let k = 1; k <= n; k++) {
+    const id = indices[(((start + dir * k) % n) + n) % n]!;
+    if (isErrorRow(index, id)) return id;
+  }
+  return null;
+}
+
+/**
+ * Global shortcuts: "/" focuses search, "[" shows/hides the filter panel, "F" toggles focus mode,
+ * "Esc" closes the detail panel, then leaves the search box, then leaves focus mode,
+ * "n" / "Shift+N" select the next / previous error row of the current view (`indices`, display order).
+ */
+export function useShortcuts(indices: Uint32Array, index: LogIndex | null): void {
+  const view = useRef({ indices, index });
+  view.current = { indices, index };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -25,6 +45,12 @@ export function useShortcuts(): void {
       } else if ((e.key === 'f' || e.key === 'F') && !typing && hasData) {
         e.preventDefault();
         state.setFocusMode(!state.focusMode);
+      } else if ((e.key === 'n' || e.key === 'N') && !typing && view.current.index && state.tab === 'rows') {
+        const id = nextErrorRow(view.current.indices, view.current.index, state.selectedId, e.shiftKey ? -1 : 1);
+        if (id !== null) {
+          e.preventDefault();
+          state.select(id);
+        }
       } else if (e.key === '/' && !typing) {
         const input = document.getElementById('global-search') as HTMLInputElement | null;
         if (input) {

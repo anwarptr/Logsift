@@ -13,7 +13,7 @@ import { TableToolbar } from './components/TableToolbar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useUrlSync } from './filters/useUrlSync';
 import { useLogStore } from './store/logStore';
-import { useDisplayIndices, useSearchHighlight, useVisibleColumns } from './store/useView';
+import { useDisplayIndices, useLogIndex, useSearchHighlight, useVisibleColumns } from './store/useView';
 import { useShortcuts } from './utils/useShortcuts';
 
 export default function App() {
@@ -26,6 +26,7 @@ export default function App() {
   const panelOpen = useLogStore((s) => s.selectedId !== null);
   const columns = useVisibleColumns();
   const indices = useDisplayIndices();
+  const index = useLogIndex();
   const highlight = useSearchHighlight();
   const sidebarOpen = useLogStore((s) => s.sidebarOpen);
   const setSidebarOpen = useLogStore((s) => s.setSidebarOpen);
@@ -35,7 +36,7 @@ export default function App() {
   const focus = useLogStore((s) => s.focusMode) && hasData;
 
   useUrlSync();
-  useShortcuts();
+  useShortcuts(indices, index);
 
   return (
     <div className={'app' + (focus ? ' focus-mode' : '')}>

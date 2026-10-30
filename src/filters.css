@@ -379,3 +379,14 @@
 .chip-x:hover {
   background: var(--accent-soft);
 }
+/* Shown while "Show in full log" has set the filters aside. */
+.paused-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 10px;
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--fg);
+  font-size: 12.5px;
+}

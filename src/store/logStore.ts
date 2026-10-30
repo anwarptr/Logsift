@@ -64,6 +64,8 @@ export interface LogState {
   filters: FilterState;
   /** True when filters came from the URL and should survive the first file load. */
   keepFiltersOnLoad: boolean;
+  /** Filters set aside by "Show in full log", with the row that was shown; null when none are paused. */
+  paused: { filters: FilterState; sort: SortState | null; lineNo: number } | null;
 
   loadFile(file: File): void;
   /** Open several files as one log, merged in time order. Unsupported or empty files are skipped. */
@@ -73,6 +75,9 @@ export interface LogState {
   setFilters(patch: Partial<FilterState>): void;
   replaceFilters(f: FilterState): void;
   clearFilters(): void;
+  /** Clear the filters (keeping them to restore) so a row can be seen among its neighbours. */
+  showInFullLog(id: number): void;
+  restoreFilters(): void;
   setFormatOverride(format: LogFormat | 'auto'): void;
   setError(message: string | null): void;
 
@@ -165,6 +170,7 @@ export const useLogStore = create<LogState>()((set, get) => {
 
   function parse(sources: LogSource[], file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean) {
     if (resetFilters && !get().keepFiltersOnLoad) set({ filters: EMPTY_FILTERS });
+    set({ paused: null });
     set({
       keepFiltersOnLoad: false,
       status: 'loading',
@@ -261,17 +267,31 @@ export const useLogStore = create<LogState>()((set, get) => {
 
     filters: initialFilters,
     keepFiltersOnLoad: hasActiveFilters(initialFilters),
+    paused: null,
 
     setFilters(patch) {
-      set((s) => ({ filters: { ...s.filters, ...patch } }));
+      set((s) => ({ filters: { ...s.filters, ...patch }, paused: null }));
     },
 
     replaceFilters(filters) {
-      set({ filters });
+      set({ filters, paused: null });
     },
 
     clearFilters() {
-      set({ filters: EMPTY_FILTERS });
+      set({ filters: EMPTY_FILTERS, paused: null });
+    },
+
+    showInFullLog(id) {
+      const s = get();
+      const row = s.rows[id];
+      if (!row || !hasActiveFilters(s.filters)) return;
+      // Sorting would scatter the neighbours, so file order is shown until filters are restored.
+      set({ paused: { filters: s.filters, sort: s.sort, lineNo: row.lineNo }, filters: EMPTY_FILTERS, sort: null, selectedId: id, tab: 'rows' });
+    },
+
+    restoreFilters() {
+      const p = get().paused;
+      if (p) set({ filters: p.filters, sort: p.sort, paused: null });
     },
 
     loadFile(file) {
