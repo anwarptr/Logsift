@@ -2,7 +2,7 @@ import { DropZone } from './DropZone';
 
 const REPO_URL = 'https://github.com/anwar-sobha/LogViewer';
 
-const FORMATS = ['IIS W3C', 'Apache / Nginx', 'Serilog', 'JSON / JSON lines', 'IIS failed request traces', 'Plain text', '.gz / .zip'];
+const FORMATS = ['IIS W3C', 'Apache / Nginx', 'Serilog', 'JSON / JSON lines', 'IIS failed request traces', 'Windows Event Log XML', 'Plain text', '.gz / .zip'];
 
 const FEATURES = [
   {

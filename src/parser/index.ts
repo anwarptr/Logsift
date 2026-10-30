@@ -4,6 +4,7 @@ import { createFrebParser } from './freb';
 import { createGenericParser } from './generic';
 import { createIisParser } from './iis';
 import { createJsonlParser } from './jsonl';
+import { createWinEventParser } from './winevent';
 import type { LineParser, LogFormat, LogRow, MalformedRow, ParseResult } from './types';
 
 export * from './types';
@@ -17,6 +18,8 @@ export function createParser(format: LogFormat): LineParser {
       return createIisParser();
     case 'freb':
       return createFrebParser();
+    case 'winevent':
+      return createWinEventParser();
     case 'apache':
       return createApacheParser();
     case 'jsonl':

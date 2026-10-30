@@ -19,8 +19,8 @@ const RENDERED_OPCODE_RE = /<RenderingInfo\b[\s\S]*?<Opcode>([^<]*)<\/Opcode>/;
 const LEVEL_RE = /<Level>(\d+)<\/Level>/;
 const SYSTEM_TIME_RE = /<TimeCreated\s+SystemTime="([^"]*)"/;
 
-/** Trace event levels (1 = most severe). */
-const LEVEL_NAMES = ['', 'Critical', 'Error', 'Warning', 'Information', 'Verbose'];
+/** Trace and Windows event levels (1 = most severe). */
+export const LEVEL_NAMES = ['', 'Critical', 'Error', 'Warning', 'Information', 'Verbose'];
 
 const ENTITY_RE = /&(?:#x([0-9a-f]+)|#(\d+)|(lt|gt|amp|quot|apos));/gi;
 const NAMED_ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
@@ -34,7 +34,7 @@ export function decodeXml(s: string): string {
   });
 }
 
-function attributes(tag: string): Record<string, string> {
+export function attributes(tag: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const m of tag.matchAll(ATTR_RE)) out[m[1]!] = decodeXml(m[2] ?? m[3] ?? '');
   return out;

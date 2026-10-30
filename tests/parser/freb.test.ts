@@ -116,6 +116,6 @@ describe('FREB files in the stream', () => {
   it('rejects XML that is not a failed request trace', async () => {
     const xml = '<?xml version="1.0"?>\n<config>\n  <add key="a" value="b" />\n</config>\n';
     await expect(run([{ name: 'web.xml', blob: new Blob([xml]) }])).rejects.toThrow(ParseError);
-    await expect(run([{ name: 'web.xml', blob: new Blob([xml]) }])).rejects.toThrow(/not an IIS failed request trace/);
+    await expect(run([{ name: 'web.xml', blob: new Blob([xml]) }])).rejects.toThrow(/neither an IIS failed request trace/);
   });
 });

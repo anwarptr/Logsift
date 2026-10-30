@@ -126,7 +126,7 @@ export function isAcceptedFile(name: string): boolean {
 }
 
 /** Noisy columns that start hidden (they can be shown from the column chooser). */
-const DEFAULT_HIDDEN = new Set(['cs(Cookie)', 'sc-substatus', 'sc-win32-status', 'timestamp_raw', 'siteId', 'processId', 'activityId']);
+const DEFAULT_HIDDEN = new Set(['cs(Cookie)', 'sc-substatus', 'sc-win32-status', 'timestamp_raw', 'siteId', 'processId', 'activityId', 'recordId']);
 
 export function defaultColumnWidth(col: ColumnDef): number {
   if (col.type === 'timestamp') return 190; // fits "2026-03-14 09:30:01.102"

@@ -293,10 +293,10 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
         const sample = ls.slice(0, 200);
         const guess = detectFormat(sample);
         // Read as plain text, other XML would only produce noise.
-        if (guess !== 'freb' && !opts.format && looksLikeXml(sample)) {
+        if (guess !== 'freb' && guess !== 'winevent' && !opts.format && looksLikeXml(sample)) {
           throw new ParseError(
-            `${multi ? `"${input.name}"` : 'This file'} is XML, but not an IIS failed request trace (fr*.xml), ` +
-              'the only XML format Logsift reads.',
+            `${multi ? `"${input.name}"` : 'This file'} is XML, but neither an IIS failed request trace (fr*.xml) ` +
+              'nor a Windows Event Log export, the XML formats Logsift reads.',
           );
         }
         return guess;

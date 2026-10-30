@@ -32,6 +32,7 @@ export function detectFormat(lines: readonly string[]): LogFormat {
   if (sample.length === 0) return 'generic';
   if (sample.some((l) => l.startsWith('#Software:') || l.startsWith('#Fields:'))) return 'iis';
   if (sample.some((l) => l.trimStart().startsWith('<failedRequest'))) return 'freb';
+  if (looksLikeXml(sample) && sample.some((l) => /<Event[\s>]/.test(l))) return 'winevent';
 
   const ratio = (pred: (l: string) => boolean) => sample.filter(pred).length / sample.length;
   if (ratio((l) => APACHE_LINE_RE.test(l)) >= MATCH_RATIO) return 'apache';
