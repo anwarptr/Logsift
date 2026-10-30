@@ -59,6 +59,7 @@ export interface LogState {
   /** Table fills the window: header, file bar, filter panel and insights are hidden. */
   focusMode: boolean;
   fileInfoExpanded: boolean;
+  helpOpen: boolean;
 
   // --- filters ---
   filters: FilterState;
@@ -96,6 +97,7 @@ export interface LogState {
   setSidebarOpen(open: boolean): void;
   setFocusMode(on: boolean): void;
   setFileInfoExpanded(expanded: boolean): void;
+  setHelpOpen(open: boolean): void;
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.csv', '.tsv', '.gz', '.zip'];
@@ -264,6 +266,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     sidebarOpen: prefs.sidebarOpen && !isNarrowScreen(),
     focusMode: false,
     fileInfoExpanded: prefs.fileInfoExpanded,
+    helpOpen: false,
 
     filters: initialFilters,
     keepFiltersOnLoad: hasActiveFilters(initialFilters),
@@ -422,6 +425,10 @@ export const useLogStore = create<LogState>()((set, get) => {
     setFileInfoExpanded(fileInfoExpanded) {
       set({ fileInfoExpanded });
       savePrefs({ fileInfoExpanded });
+    },
+
+    setHelpOpen(helpOpen) {
+      set({ helpOpen });
     },
 
     setSlowThreshold(ms) {

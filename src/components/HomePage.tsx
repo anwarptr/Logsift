@@ -47,7 +47,7 @@ export function HomePage() {
 
       <p className="home-tips muted">
         Tip: drop several files to merge them into one timeline, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere to
-        paste log text.
+        paste log text. New here? Press <kbd>?</kbd> or <b>Help</b> at the top.
       </p>
 
       <footer className="home-footer">

@@ -49,8 +49,8 @@ export function PasteDialog({ onClose }: { onClose: () => void }) {
       >
         <h2 id="paste-title">Paste log text</h2>
         <p className="muted">
-          Any supported format: IIS (include the <code>#Fields:</code> line), Apache/Nginx, JSON lines or plain text.
-          The text is parsed locally.
+          Any supported format (see Help); for IIS logs include the <code>#Fields:</code> line. The text is parsed
+          locally.
         </p>
         <label htmlFor="paste-text" className="visually-hidden">
           Log text

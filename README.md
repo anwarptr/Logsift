@@ -158,7 +158,9 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   as ↗ in the IP filter list and Top client IPs. IPv4, IPv6, `[v6]:port` and `v4:port` are recognised.
 - **Export** the filtered rows in the current sort order to CSV (visible columns) or JSON (all fields + line number).
 - **Theme**: follows the system by default; toggle cycles system → light → dark (remembered per browser).
-- **Shortcuts**: `/` focuses search, `[` shows/hides the filter panel, `F` toggles focus mode, `Esc` closes the
+- **Help**: the header's **Help** button (or `?`) opens a short in-app guide: opening logs, the supported formats,
+  filters, views, row details, shortcuts, time zones, installing and privacy. It is part of the app, so it works offline.
+- **Shortcuts**: `?` opens the help, `/` focuses search, `[` shows/hides the filter panel, `F` toggles focus mode, `Esc` closes the
   detail panel / clears the selection, then blurs search, then leaves focus mode,
   arrow keys / PageUp / PageDown / Home / End move through rows, Enter or Space opens a row, `n` / `Shift+N` jump to
   the next / previous error row.

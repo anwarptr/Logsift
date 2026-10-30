@@ -3,6 +3,7 @@ import { EndpointsTable } from './components/EndpointsTable';
 import { FileInfo } from './components/FileInfo';
 import { FilterChips } from './components/FilterChips';
 import { FilterSidebar } from './components/FilterSidebar';
+import { HelpDialog } from './components/HelpDialog';
 import { HomePage } from './components/HomePage';
 import { InsightsPanel } from './components/InsightsPanel';
 import { LogTable } from './components/LogTable';
@@ -30,6 +31,8 @@ export default function App() {
   const index = useLogIndex();
   const highlight = useSearchHighlight();
   const sidebarOpen = useLogStore((s) => s.sidebarOpen);
+  const helpOpen = useLogStore((s) => s.helpOpen);
+  const setHelpOpen = useLogStore((s) => s.setHelpOpen);
   const setSidebarOpen = useLogStore((s) => s.setSidebarOpen);
   const insightsOpen = useLogStore((s) => s.insightsOpen);
   const setInsightsOpen = useLogStore((s) => s.setInsightsOpen);
@@ -58,6 +61,9 @@ export default function App() {
             </button>
           )}
           {hasData && <DropZone compact />}
+          <button type="button" className="btn small" title="How to use Logsift (?)" onClick={() => setHelpOpen(true)}>
+            Help
+          </button>
           <ThemeToggle />
         </div>
       </header>
@@ -158,6 +164,7 @@ export default function App() {
           </main>
         )
       )}
+      {helpOpen && <HelpDialog />}
     </div>
   );
 }

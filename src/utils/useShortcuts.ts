@@ -27,7 +27,7 @@ export function nextErrorRow(indices: Uint32Array, index: LogIndex, selectedId: 
 /**
  * Global shortcuts: "/" focuses search, "[" shows/hides the filter panel, "F" toggles focus mode,
  * "Esc" closes the detail panel, then leaves the search box, then leaves focus mode,
- * "n" / "Shift+N" select the next / previous error row of the current view (`indices`, display order).
+ * "?" opens the help, "n" / "Shift+N" select the next / previous error row of the current view (`indices`, display order).
  */
 export function useShortcuts(indices: Uint32Array, index: LogIndex | null): void {
   const view = useRef({ indices, index });
@@ -51,6 +51,9 @@ export function useShortcuts(indices: Uint32Array, index: LogIndex | null): void
           e.preventDefault();
           state.select(id);
         }
+      } else if (e.key === '?' && !typing) {
+        e.preventDefault();
+        state.setHelpOpen(true);
       } else if (e.key === '/' && !typing) {
         const input = document.getElementById('global-search') as HTMLInputElement | null;
         if (input) {

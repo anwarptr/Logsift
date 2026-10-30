@@ -442,3 +442,22 @@ describe('patterns view', () => {
     act(() => useLogStore.getState().clearFilters());
   });
 });
+
+describe('help', () => {
+  it('opens from the header button and the ? key, and closes with Esc', async () => {
+    await loadSample();
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    const dialog = screen.getByRole('dialog', { name: 'Help' });
+    for (const heading of ['Open a log', 'Supported formats', 'Keyboard shortcuts', 'Privacy']) {
+      expect(within(dialog).getByRole('heading', { name: heading })).toBeTruthy();
+    }
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Close help' }));
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Help' })).toBeNull();
+
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.getByRole('dialog', { name: 'Help' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close help' }));
+    expect(screen.queryByRole('dialog', { name: 'Help' })).toBeNull();
+  });
+});
