@@ -461,3 +461,37 @@ describe('help', () => {
     expect(screen.queryByRole('dialog', { name: 'Help' })).toBeNull();
   });
 });
+
+describe('charts', () => {
+  it('shows response times, traffic and request flow, and filters from a chart', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    fireEvent.click(screen.getByRole('tab', { name: 'Charts' }));
+    const panel = screen.getByRole('tabpanel');
+    for (const name of ['Response times', 'Traffic by hour', 'Request flow']) {
+      expect(within(panel).getByRole('region', { name })).toBeTruthy();
+    }
+    expect(within(panel).getByRole('img', { name: /Response times of 16 requests/ })).toBeTruthy();
+    // Clicking the 4xx box in the flow filters to that status class.
+    const flow = within(panel).getByRole('region', { name: 'Request flow' });
+    const box = [...flow.querySelectorAll('.flow-node')].find((g) => g.textContent === '4xx')!;
+    fireEvent.click(box);
+    expect(useLogStore.getState().filters.statusClasses).toEqual(['4xx']);
+    expect(rowCount()).toBe('13 of 16 rows');
+    act(() => useLogStore.getState().clearFilters());
+    act(() => useLogStore.getState().setTab('rows'));
+  });
+
+  it('shows where a failed request spent its time in the row details', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const { readFileSync } = await import('node:fs');
+    act(() => useLogStore.getState().loadText(readFileSync('fixtures/sample-freb.xml', 'utf8')));
+    await waitFor(() => expect(rowCount()).toBe('1 of 1 rows'));
+    act(() => useLogStore.getState().select(0));
+    const details = screen.getByRole('complementary', { name: /Details for line/ });
+    const waterfall = within(details).getByRole('region', { name: 'Where the time went' });
+    expect(waterfall.textContent).toContain('ConfigurationValidationModule set the error status');
+    act(() => useLogStore.getState().select(null));
+  });
+});

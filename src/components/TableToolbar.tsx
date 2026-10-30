@@ -16,6 +16,7 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
   const hasDuration = useLogStore((s) => s.schema.some((c) => c.role === 'duration'));
   const hasUri = useLogStore((s) => s.schema.some((c) => c.role === 'uri'));
   const hasMessage = useLogStore((s) => s.schema.some((c) => c.role === 'message'));
+  const hasCharts = useLogStore((s) => s.schema.some((c) => c.role === 'timestamp' || c.role === 'duration' || c.role === 'uri'));
   const focusMode = useLogStore((s) => s.focusMode);
   const setFocusMode = useLogStore((s) => s.setFocusMode);
 
@@ -58,6 +59,20 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
             onClick={() => setTab('patterns')}
           >
             Patterns
+          </button>
+        )}
+        {hasCharts && (
+          <button
+            type="button"
+            role="tab"
+            id="tab-charts"
+            aria-selected={tab === 'charts'}
+            aria-controls="panel-charts"
+            className="tab"
+            title="Response times, traffic by hour and request flow"
+            onClick={() => setTab('charts')}
+          >
+            Charts
           </button>
         )}
         <button

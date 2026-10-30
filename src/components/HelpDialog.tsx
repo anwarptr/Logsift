@@ -105,6 +105,7 @@ export function HelpDialog() {
               <li><b>Rows</b>: the log itself. Click a column header to sort, drag its edge to resize; <b>Columns</b> shows, hides and reorders them.</li>
               <li><b>Endpoints</b>: requests grouped by URL, with error rates and response times.</li>
               <li><b>Patterns</b>: similar messages grouped together, so repeated errors stand out.</li>
+              <li><b>Charts</b>: response times over time and by range, traffic by hour of day, and a request flow from callers to endpoints to status codes. Click or drag in a chart to filter.</li>
               <li><b>Malformed</b>: lines that could not be read, with the reason.</li>
             </ul>
           </section>
@@ -114,6 +115,7 @@ export function HelpDialog() {
             <ul>
               <li>Click a row to see all its fields. <b>Only this</b> next to a value shows only rows with that value.</li>
               <li><b>Show in full log</b> sets your filters aside to show the row among its neighbours; <b>Restore filters</b> brings them back.</li>
+              <li>For an IIS failed request trace, <b>Where the time went</b> shows how long each module took.</li>
               <li><b>Copy as JSON</b> and <b>Copy raw line</b> copy the row; <b>Export</b> saves the filtered rows as CSV or JSON.</li>
             </ul>
           </section>

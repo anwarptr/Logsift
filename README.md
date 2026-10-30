@@ -138,11 +138,20 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   Fields that have a filter get an **Only this** link (show only rows with that value: any facet column, or the
   exact URI). With filters on, **Show in full log** clears them for the moment and shows the row among its
   neighbours in file order; a note above the table offers **Restore filters** (changing any filter also ends it).
+  For an IIS failed request trace, **Where the time went** draws each module step (start/end event pairs) on a
+  timeline with its duration, marking the module that set the error status.
 - **Patterns** tab (logs with a message column): messages grouped by shape — the first line with GUIDs, dates and
   times, quoted values, IPs, hex ids and numbers replaced (`Order {n} took {n} ms`). Per pattern: rows, errors, most
   common level, first and last seen, over the current filters; sortable and searchable. Click one to filter the rows
   to it (a **Pattern** chip). Patterns are worked out the first time the tab or filter is used, so logs that never
   use them pay nothing.
+- **Charts** tab (follows the filters; computed only while open, ≈ 0.2 s for 500k rows): **response time over time**
+  (every request as a dot on a log scale, errors in red, the p95 per time bucket as a line; drag to filter a time
+  range), **response time distribution** (requests per duration range with errors stacked; click a bar to filter that
+  range), **traffic by hour** (a day × hour heatmap in the display zone, or weekday × hour when the log spans more than a
+  month; Requests/Errors toggle; click a cell to filter that hour) and **request flow** (a Sankey diagram: top callers —
+  client IP, else host/site/logger — → top endpoint patterns → status classes, the rest folded into *Other*; click a
+  box to filter). Each appears only when the log has the columns it needs.
 - **Endpoints** tab: requests grouped by URI pattern — lower-cased, trailing `/` dropped, and variable segments
   replaced (numbers → `{id}`, GUIDs → `{guid}`, dates → `{date}`, long hex → `{hash}`, long opaque tokens →
   `{token}`), so `/api/Products/123` and `/api/products/456/` are both `/api/products/{id}`. Per endpoint: methods,

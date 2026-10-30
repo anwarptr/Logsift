@@ -1,3 +1,4 @@
+import { ChartsView } from './components/charts/ChartsView';
 import { DropZone, ParseProgress } from './components/DropZone';
 import { EndpointsTable } from './components/EndpointsTable';
 import { FileInfo } from './components/FileInfo';
@@ -147,6 +148,10 @@ export default function App() {
               ) : tab === 'patterns' ? (
                 <div role="tabpanel" id="panel-patterns" aria-labelledby="tab-patterns" className="tab-panel">
                   <PatternsTable />
+                </div>
+              ) : tab === 'charts' ? (
+                <div role="tabpanel" id="panel-charts" aria-labelledby="tab-charts" className="tab-panel">
+                  <ChartsView />
                 </div>
               ) : (
                 <div role="tabpanel" id="panel-malformed" aria-labelledby="tab-malformed" className="tab-panel">

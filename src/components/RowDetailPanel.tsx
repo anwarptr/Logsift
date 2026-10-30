@@ -6,6 +6,7 @@ import { useDisplayZone, useLogIndex } from '../store/useView';
 import { copyText } from '../utils/clipboard';
 import { rowToJson } from '../utils/export';
 import { cellText } from './cells';
+import { FrebWaterfall } from './FrebWaterfall';
 import { IpInfo } from './IpInfo';
 
 export function RowDetailPanel() {
@@ -108,6 +109,7 @@ export function RowDetailPanel() {
           );
         })}
       </dl>
+      {isTrace && <FrebWaterfall timeline={row.raw} />}
       <h3>{isTrace ? 'Event timeline' : 'Raw'}</h3>
       <pre className="detail-raw">{row.raw}</pre>
     </aside>

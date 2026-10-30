@@ -6,6 +6,7 @@ import './styles.css';
 import './table.css';
 import './filters.css';
 import './insights.css';
+import './charts.css';
 import './responsive.css';
 
 setUpApp();

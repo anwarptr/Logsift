@@ -3,6 +3,7 @@ import { BIT_ENDPOINT, BIT_PATTERN, compileSearch, evaluateFilters, type FilterE
 import { buildLogIndex, type LogIndex } from '../filters/logIndex';
 import type { FilterState } from '../filters/types';
 import type { ColumnDef, LogRow, LogTimeZone } from '../parser';
+import { durationBins, heatmap, requestFlow, responseTimes } from '../utils/charts';
 import { computeEndpoints, type EndpointStat } from '../utils/endpoints';
 import { computeInsights, type Insights } from '../utils/insights';
 import { computePatterns, getPatternIndex, type PatternStat } from '../utils/messagePatterns';
@@ -146,4 +147,23 @@ export function usePatterns(): PatternStat[] | null {
   const levelKey = schema.find((c) => c.role === 'level')?.key;
   if (!index?.messageKey || !ev) return null;
   return getPatterns(rows, index, ev.mask, levelKey);
+}
+
+const getChartData = memoLast((rows: LogRow[], schema: ColumnDef[], index: LogIndex, matched: Uint32Array, zone: DisplayZone) => ({
+  matched,
+  times: responseTimes(index, matched, zone),
+  bins: durationBins(index, matched),
+  heat: heatmap(index, matched, zone),
+  flow: requestFlow(rows, schema, index, matched),
+}));
+
+/** Data for the Charts tab over the filtered rows; computed only while the tab is shown. null while loading. */
+export function useChartData() {
+  const rows = useLogStore((s) => s.rows);
+  const schema = useLogStore((s) => s.schema);
+  const index = useLogIndex();
+  const ev = useFilterEval();
+  const zone = useDisplayZone();
+  if (!index || !ev) return null;
+  return getChartData(rows, schema, index, ev.matched, zone);
 }
