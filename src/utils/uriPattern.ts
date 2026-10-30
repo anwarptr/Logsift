@@ -18,10 +18,11 @@ function normalizeSegment(seg: string): string {
 /**
  * Group key for a URI path: lower-cased (IIS paths are case-insensitive), trailing slash removed,
  * and variable segments replaced: numbers → {id}, GUIDs → {guid}, dates → {date}, long hex → {hash},
- * long opaque tokens → {token}. "/api/Products/123/" → "/api/products/{id}".
+ * long opaque tokens → {token}. "/api/Products/123/" → "/api/products/{id}". Full URLs (as in CSV exports)
+ * are grouped by their path, without scheme, host or query.
  */
 export function uriPattern(uri: string): string {
-  const path = uri.toLowerCase();
+  const path = uri.toLowerCase().replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/, '').replace(/[?#].*$/, '');
   const segs = path.split('/').map(normalizeSegment);
   let out = segs.join('/');
   if (out.length > 1 && out.endsWith('/')) out = out.slice(0, -1);

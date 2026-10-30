@@ -19,6 +19,8 @@
         "text/plain": [".log", ".txt"],
         "application/json": [".json", ".jsonl", ".ndjson", ".clef"],
         "text/xml": [".xml"],
+        "text/csv": [".csv"],
+        "text/tab-separated-values": [".tsv"],
         "application/gzip": [".gz"],
         "application/zip": [".zip"]
       }

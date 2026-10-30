@@ -138,7 +138,7 @@ describe('compressed input', () => {
 
   it('reports archives without logs, broken archives and broken gzip clearly', async () => {
     await expect(run([{ name: 'x.zip', blob: makeZip([{ name: 'a.md', data: 'x' }]) }])).rejects.toThrow(
-      /"x\.zip" contains no log files \(\.log, \.txt, \.json or \.xml\)/,
+      /"x\.zip" contains no log files \(\.log, \.txt, \.json, \.xml or \.csv\)/,
     );
     await expect(run([{ name: 'x.zip', blob: new Blob(['not a zip at all']) }])).rejects.toThrow(/not a valid ZIP/);
     await expect(run([{ name: 'x.log.gz', blob: new Blob(['not gzip data']) }])).rejects.toBeInstanceOf(ParseError);

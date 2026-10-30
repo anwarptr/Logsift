@@ -18,6 +18,8 @@ describe('uriPattern', () => {
     ['/static/main.3b8f9c2a1d4e5f60.bundle.js', '/static/main.3b8f9c2a1d4e5f60.bundle.js'],
     ['/api/v2/items', '/api/v2/items'],
     ['/health', '/health'],
+    ['https://shop.example.test/api/Orders/42?x=1', '/api/orders/{id}'],
+    ['https://shop.example.test', '/'],
   ])('%s → %s', (uri, pattern) => {
     expect(uriPattern(uri)).toBe(pattern);
   });

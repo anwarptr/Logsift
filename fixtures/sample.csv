@@ -1,0 +1,6 @@
+TimeGenerated [UTC],Level,Message,ResultCode,DurationMs,Url,client_IP
+"3/14/2026, 9:30:01.100 AM",Information,Request finished,200,12.5,https://shop.example.test/api/orders,10.0.0.7
+"3/14/2026, 9:30:02.250 AM",Warning,"Slow query, 2 retries",200,1830,https://shop.example.test/api/orders/42,10.0.0.8
+"3/14/2026, 9:30:05.000 PM",Error,"Payment failed: ""card declined""
+   at Payments.Charge()",500,95,https://shop.example.test/api/pay,10.0.0.7
+"3/14/2026, 9:31:00.000 PM",Information,Request finished,404,3,https://shop.example.test/missing,

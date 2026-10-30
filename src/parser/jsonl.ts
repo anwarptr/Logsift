@@ -4,7 +4,8 @@ import type { CellValue, ColumnRole, LineParser, LogRow, MalformedRow, ParsedChu
 
 const TIMESTAMP_KEYS = ['timestamp', '@timestamp', 'time', 'ts', 'date', 'datetime', 'Timestamp', 'Time', '@t'];
 
-const KEY_ROLES: Record<string, ColumnRole> = {
+/** Semantic roles for well-known field names (lower-cased); also used for CSV headers. */
+export const KEY_ROLES: Record<string, ColumnRole> = {
   level: 'level',
   severity: 'level',
   lvl: 'level',

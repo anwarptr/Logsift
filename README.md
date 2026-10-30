@@ -40,11 +40,11 @@ worker on `file://` pages; that's why the launcher runs a small local server.
 
 In Chrome or Edge, open the site (or the launcher's page) and click the install icon in the address bar (or
 menu → *Install Logsift*). The installed app opens in its own window, works **offline** once it has been opened
-once, and on Windows appears under *Open with* for `.log`, `.txt`, `.json`, `.xml`, `.gz` and `.zip` files.
+once, and on Windows appears under *Open with* for `.log`, `.txt`, `.json`, `.xml`, `.csv`, `.gz` and `.zip` files.
 A small service worker (`public/sw.js`, production builds only) keeps the app's own files for offline use; it
 never sees log data, since files are read by the page itself. New versions load as soon as there is a connection.
 
-Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml` files (or `.gz`/`.zip` archives of them) anywhere on the page,
+Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml`/`.csv` files (or `.gz`/`.zip` archives of them) anywhere on the page,
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
 
@@ -56,7 +56,7 @@ interleaved by timestamp, and a **source file** column (also a filter) says wher
 stay per file, and the row details and Malformed tab show the file name.
 
 - **`.gz`** files are decompressed while streaming (`u_ex261027.log.gz` → `u_ex261027.log`).
-- **`.zip`** archives are expanded: every `.log`/`.txt`/`.json`/`.jsonl`/`.ndjson`/`.clef`/`.xml` entry is parsed
+- **`.zip`** archives are expanded: every `.log`/`.txt`/`.json`/`.jsonl`/`.ndjson`/`.clef`/`.xml`/`.csv`/`.tsv` entry is parsed
   (other files and folders, such as FREB's `freb.xsl`, are ignored). Zip a failed-request-tracing folder to open all
   its `fr*.xml` traces at once.
   Stored and deflated entries are supported; ZIP64 and password-protected archives are not.
@@ -86,6 +86,7 @@ re-parses the file with a forced format.
 | **JSON lines** | ≥ 60% of lines are JSON objects | Columns are the union of keys; nested values are shown as JSON. `timestamp`/`@timestamp`/`time`/`ts`/`date` becomes the timestamp; `level`/`severity`, `message`/`msg`, `logger`/`source`, `status`, `path`/`url`, `durationMs` get semantic roles. Files may be `.json`, `.jsonl`, `.ndjson` or `.clef`. **Serilog JSON**: compact JSON (CLEF: `@t`, `@l`, `@mt`/`@m`, `@x`) becomes `level` (missing `@l` means Information), `message` (the template filled from the event's properties), `MessageTemplate`, `Exception`, `TraceId`/`SpanId`; the older `JsonFormatter`'s `Properties` are spread into their own columns and `RenderedMessage` is the message; `RequestPath`/`RequestMethod`/`StatusCode`/`Elapsed` from request logging get the URI/method/status/duration roles. |
 | **JSON document** | file starts with `[`, or with a `{` that isn't a complete one-line object | A single JSON array of entries (pretty-printed or not), an object wrapping one (`{"logs": [ … ]}`, `{"value": [ … ]}`: the first array of objects is used), or a lone object. Each entry is a row, handled as JSON lines above; "line" numbers count entries. The document is parsed in memory, so it is limited to 256 MB (save bigger exports as JSON lines). Text that turns out not to be valid JSON is read line by line instead. |
 | **Syslog** | ≥ 60% of lines are syslog | BSD/RFC 3164 (`Oct 27 04:42:03 web01 sshd[1234]: message`, optional `<PRI>`), RFC 5424 (`<165>1 2026-10-27T04:42:03Z web01 app 123 ID47 [sd] message`) and rsyslog's ISO-timestamp lines (`2026-10-27T04:42:03.120+04:00 web01 app[88]: message`). Columns: `timestamp`, `level` and `facility` (from the priority: EMERG/ALERT/CRIT/ERROR count as errors), `host`, `app`, `pid`, `msgid`, `message`; a column only appears when some line has it. Lines that aren't syslog are appended to the previous entry. BSD lines have **no year and no zone**: the year is the file's (lines from a later month than the file's are taken as last year, e.g. December lines in a January file), times are shown as written, and the file bar says "Date assumed: year …". |
+| **CSV / TSV** | a header row of names, and ≥ 80% of records with the same field count | Comma, tab or semicolon (the one that splits the header into the most fields); comma and semicolon files need at least 3 columns, so ordinary text with a comma per line isn't mistaken for a table (choose the format by hand for a 2-column file). RFC 4180 quoting, including quoted line breaks and `""`. The time column (`timestamp`, `time`, `date`, `TimeGenerated [UTC]`, …) becomes the timestamp: ISO, epoch, or Log Analytics' `10/30/2026, 4:48:28.868 AM` (day first when the first number is > 12), read as UTC. Numbers become numbers; roles come from header names (`Level`/`severityLevel`, `Message`, `resultCode`/`status`, `DurationMs`/`duration`, `Url`, `client_IP`, …) so filters, insights and endpoints work. Application Insights' numeric `severityLevel` (0–4) is shown as Verbose…Critical. Records with the wrong number of fields go to Malformed (a trailing delimiter is tolerated). |
 | **Generic text** | fallback | Regex extracts a leading ISO-like timestamp, a level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL and common aliases like `WRN`, `Information`), an optional `[logger]`, and the message. Lines without a timestamp (stack traces) are appended to the previous entry. Covers **Serilog** file logs (`{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message}`): ASP.NET Core request lines (`HTTP GET /api/x responded 200 in 12.3 ms`, from `UseSerilogRequestLogging()`) also fill `RequestMethod`, `RequestPath`, `StatusCode` and `Elapsed (ms)`, so status filters, error rate, slow rows and the Endpoints view work. In such mixed logs a row is an error when its status is ≥ 400, or, for lines without a status, when its level is ERROR/FATAL. Lines with a **time but no date** are read too when a level follows the time (Serilog's console default `[11:54:02 INF] message`, also `11:54:02.120 WARN …`, leading spaces allowed): the date is the file's last-modified date (today for pasted text) and moves on a day when the clock goes back more than an hour (past midnight). The file bar then shows "Date assumed: …" so the guess is never silent. |
 
 ### Time zones
@@ -121,7 +122,7 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 
 ## Features
 
-- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.json`/`.xml`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
+- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.json`/`.xml`/`.csv`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
   rows parsed / lines skipped / detected format / parse time, metadata (`#`) lines, clear errors for wrong type,
   empty, binary or unparseable files. The file bar is one line by default (file, rows, format, time zone);
   *Details* shows size, parse time, metadata lines and where the time zone came from.

@@ -45,7 +45,7 @@ export class ParseError extends Error {}
 export class CancelledError extends Error {}
 
 /** Accepted inside archives. */
-const LOG_NAME_RE = /\.(log|txt|json|jsonl|ndjson|clef|xml)$/i;
+const LOG_NAME_RE = /\.(log|txt|json|jsonl|ndjson|clef|xml|csv|tsv)$/i;
 const GZIP_RE = /\.gz$/i;
 
 /** A whole JSON document (not JSON lines) is parsed in memory, so it is capped. */
@@ -170,7 +170,7 @@ async function expandSources(sources: LogSource[], chunkBytes: number): Promise<
       } catch (e) {
         throw new ParseError(`"${s.name}": ${e instanceof ZipError ? e.message : String(e)}`);
       }
-      if (entries.length === 0) throw new ParseError(`"${s.name}" contains no log files (.log, .txt, .json or .xml).`);
+      if (entries.length === 0) throw new ParseError(`"${s.name}" contains no log files (.log, .txt, .json, .xml or .csv).`);
       entries.sort((a, b) => compareNames(a.name, b.name));
       for (const entry of entries) {
         const data = await zipEntryData(s.blob, entry).catch((e: unknown) => {

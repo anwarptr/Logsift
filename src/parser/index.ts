@@ -1,4 +1,5 @@
 import { createApacheParser } from './apache';
+import { createCsvParser } from './csv';
 import { detectFormat } from './detectFormat';
 import { createFrebParser } from './freb';
 import { createGenericParser } from './generic';
@@ -27,6 +28,8 @@ export function createParser(format: LogFormat): LineParser {
       return createJsonlParser();
     case 'syslog':
       return createSyslogParser();
+    case 'csv':
+      return createCsvParser();
     case 'generic':
       return createGenericParser();
   }

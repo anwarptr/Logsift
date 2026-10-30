@@ -98,7 +98,7 @@ export interface LogState {
   setFileInfoExpanded(expanded: boolean): void;
 }
 
-export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.gz', '.zip'];
+export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.csv', '.tsv', '.gz', '.zip'];
 
 /** Display name for text pasted instead of a file (also the base of export file names). */
 export const PASTED_NAME = 'pasted-text.txt';
@@ -305,8 +305,8 @@ export const useLogStore = create<LogState>()((set, get) => {
       if (ok.length === 0) {
         const f = all[0]!;
         let error: string;
-        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .json, .xml, .gz or .zip files.';
-        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .json, .xml, .gz or .zip file.`;
+        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .json, .xml, .csv, .gz or .zip files.';
+        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .json, .xml, .csv, .gz or .zip file.`;
         else error = `"${f.name}" is empty.`;
         set({ error });
         return;
