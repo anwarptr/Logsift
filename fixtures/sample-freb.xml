@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xml-stylesheet type='text/xsl' href='freb.xsl'?>
+<!-- saved from url=(0014)about:internet -->
+<failedRequest url="http://shop.example.test:80/api/orders/42?expand=lines&amp;v=2"
+               siteId="1"
+               appPoolId="ShopApi"
+               processId="4242"
+               verb="POST"
+               remoteUserName=""
+               userName="alice"
+               tokenUserName="IIS APPPOOL\ShopApi"
+               authenticationType="anonymous"
+               activityId="{00000000-0000-0000-0000-000000000042}"
+               failureReason="STATUS_CODE"
+               statusCode="500.19"
+               triggerStatusCode="500"
+               timeTaken="125"
+               xmlns:freb="http://schemas.microsoft.com/win/2006/06/iis/freb"
+               >
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+ <System>
+  <Provider Name="WWW Server" Guid="{3A2A4E84-4C21-4981-AE10-3FDA0D9B0F83}"/>
+  <Level>0</Level>
+  <Opcode>1</Opcode>
+  <TimeCreated SystemTime="2026-03-14T09:30:01.100Z"/>
+ </System>
+ <EventData>
+  <Data Name="ContextId">{00000000-0000-0000-0000-000000000042}</Data>
+  <Data Name="RequestURL">http://shop.example.test:80/api/orders/42?expand=lines&amp;v=2</Data>
+  <Data Name="RequestVerb">POST</Data>
+ </EventData>
+ <RenderingInfo Culture="en-US">
+  <Opcode>GENERAL_REQUEST_START</Opcode>
+ </RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+ <System>
+  <Provider Name="WWW Server" Guid="{3A2A4E84-4C21-4981-AE10-3FDA0D9B0F83}"/>
+  <Level>4</Level>
+  <Opcode>50</Opcode>
+  <TimeCreated SystemTime="2026-03-14T09:30:01.102Z"/>
+ </System>
+ <EventData>
+  <Data Name="ContextId">{00000000-0000-0000-0000-000000000042}</Data>
+  <Data Name="Headers">Host: shop.example.test
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Example/1.0
+Content-Length: 0
+</Data>
+ </EventData>
+ <RenderingInfo Culture="en-US">
+  <Opcode>GENERAL_REQUEST_HEADERS</Opcode>
+ </RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+ <System>
+  <Provider Name="WWW Server" Guid="{3A2A4E84-4C21-4981-AE10-3FDA0D9B0F83}"/>
+  <Level>5</Level>
+  <Opcode>1</Opcode>
+  <TimeCreated SystemTime="2026-03-14T09:30:01.110Z"/>
+ </System>
+ <EventData>
+  <Data Name="ContextId">{00000000-0000-0000-0000-000000000042}</Data>
+  <Data Name="ModuleName">ConfigurationValidationModule</Data>
+  <Data Name="Notification">1</Data>
+  <Data Name="fIsPostNotification">false</Data>
+ </EventData>
+ <RenderingInfo Culture="en-US">
+  <Opcode>NOTIFY_MODULE_START</Opcode>
+  <freb:Description Data="Notification">BEGIN_REQUEST</freb:Description>
+ </RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+ <System>
+  <Provider Name="WWW Server" Guid="{3A2A4E84-4C21-4981-AE10-3FDA0D9B0F83}"/>
+  <Level>2</Level>
+  <Opcode>16</Opcode>
+  <TimeCreated SystemTime="2026-03-14T09:30:01.200Z"/>
+ </System>
+ <EventData>
+  <Data Name="ContextId">{00000000-0000-0000-0000-000000000042}</Data>
+  <Data Name="ModuleName">ConfigurationValidationModule</Data>
+  <Data Name="Notification">1</Data>
+  <Data Name="HttpStatus">500</Data>
+  <Data Name="HttpReason">Internal Server Error</Data>
+  <Data Name="HttpSubStatus">19</Data>
+  <Data Name="ErrorCode">2147942413</Data>
+  <Data Name="ConfigExceptionInfo">\\?\C:\inetpub\shop\web.config ( 12) :Cannot read configuration file due to insufficient permissions</Data>
+ </EventData>
+ <RenderingInfo Culture="en-US">
+  <Opcode>MODULE_SET_RESPONSE_ERROR_STATUS</Opcode>
+  <freb:Description Data="Notification">BEGIN_REQUEST</freb:Description>
+  <freb:Description Data="ErrorCode">The data is invalid. (0x8007000d)</freb:Description>
+ </RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+ <System>
+  <Provider Name="WWW Server" Guid="{3A2A4E84-4C21-4981-AE10-3FDA0D9B0F83}"/>
+  <Level>0</Level>
+  <Opcode>2</Opcode>
+  <TimeCreated SystemTime="2026-03-14T09:30:01.225Z"/>
+ </System>
+ <EventData>
+  <Data Name="ContextId">{00000000-0000-0000-0000-000000000042}</Data>
+  <Data Name="BytesSent">1208</Data>
+  <Data Name="BytesReceived">412</Data>
+  <Data Name="HttpStatus">500</Data>
+  <Data Name="HttpSubStatus">19</Data>
+ </EventData>
+ <RenderingInfo Culture="en-US">
+  <Opcode>GENERAL_REQUEST_END</Opcode>
+ </RenderingInfo>
+</Event>
+</failedRequest>

@@ -36,7 +36,7 @@ It serves the production build (`vite preview`) on localhost only, so other mach
 leave your PC. Opening `dist\index.html` directly from disk does not work, because browsers block the parser's
 worker on `file://` pages; that's why the launcher runs a small local server.
 
-Open the app, then drop one or more `.log`/`.txt`/`.json` files (or `.gz`/`.zip` archives of them) anywhere on the page,
+Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml` files (or `.gz`/`.zip` archives of them) anywhere on the page,
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
 
@@ -48,8 +48,9 @@ interleaved by timestamp, and a **source file** column (also a filter) says wher
 stay per file, and the row details and Malformed tab show the file name.
 
 - **`.gz`** files are decompressed while streaming (`u_ex261027.log.gz` → `u_ex261027.log`).
-- **`.zip`** archives are expanded: every `.log`/`.txt`/`.json`/`.jsonl`/`.ndjson`/`.clef` entry is parsed (other
-  files and folders are ignored).
+- **`.zip`** archives are expanded: every `.log`/`.txt`/`.json`/`.jsonl`/`.ndjson`/`.clef`/`.xml` entry is parsed
+  (other files and folders, such as FREB's `freb.xsl`, are ignored). Zip a failed-request-tracing folder to open all
+  its `fr*.xml` traces at once.
   Stored and deflated entries are supported; ZIP64 and password-protected archives are not.
 - Decompression uses the browser's built-in `DecompressionStream`, so it adds no code and nothing is uploaded.
 - Empty or unsupported files in a selection are skipped with a notice; the rest still open.
@@ -71,6 +72,7 @@ re-parses the file with a forced format.
 | Format | Detection | Notes |
 | --- | --- | --- |
 | **IIS W3C Extended** | any `#Software:` / `#Fields:` line | Columns come from `#Fields:`; a new `#Fields:` mid-file switches the schema from that line on. `#` lines go to the File Info metadata list. `-` → null. `date`+`time` → one UTC `timestamp`. Numeric fields (`s-port`, `sc-status`, `sc-substatus`, `sc-win32-status`, `sc-bytes`, `cs-bytes`, `time-taken`) become numbers. |
+| **IIS failed request trace** (FREB, `fr*.xml`) | a `<failedRequest` line | One file is one failed request, so it becomes **one row**: `timestamp` (first event), `method`, `host`, `uri`, `query`, `status`/`subStatus` (`500.19` → 500 and 19), `timeTaken` (ms), `failureReason`, `level` (the most severe event), `module`/`notification` (who set the error status, and when), a `message` summing it up with the error code and any config error, `bytesSent`/`bytesReceived`, `userAgent`, `appPool`, `userName` and the event count. The row's raw text is the **event timeline** (time, ms since the first event, event name, warnings/errors flagged, data fields with IIS's descriptions in place of numeric codes), shown under "Event timeline" in the row details and searchable like any raw text. Each event is not its own row: a single request has hundreds, which would swamp the table and the endpoint counts. The XML is read with a small built-in reader (the browser's `DOMParser` is not available in workers). Other XML files are rejected with a clear message rather than parsed as text. |
 | **Apache/Nginx combined** (and common) | ≥ 60% of lines match | Mapped to IIS-style column names (`c-ip`, `cs-method`, `cs-uri-stem`, `sc-status`, `sc-bytes`, …) so the same filters and insights apply. |
 | **JSON lines** | ≥ 60% of lines are JSON objects | Columns are the union of keys; nested values are shown as JSON. `timestamp`/`@timestamp`/`time`/`ts`/`date` becomes the timestamp; `level`/`severity`, `message`/`msg`, `logger`/`source`, `status`, `path`/`url`, `durationMs` get semantic roles. Files may be `.json`, `.jsonl`, `.ndjson` or `.clef`. **Serilog JSON**: compact JSON (CLEF: `@t`, `@l`, `@mt`/`@m`, `@x`) becomes `level` (missing `@l` means Information), `message` (the template filled from the event's properties), `MessageTemplate`, `Exception`, `TraceId`/`SpanId`; the older `JsonFormatter`'s `Properties` are spread into their own columns and `RenderedMessage` is the message; `RequestPath`/`RequestMethod`/`StatusCode`/`Elapsed` from request logging get the URI/method/status/duration roles. |
 | **JSON document** | file starts with `[`, or with a `{` that isn't a complete one-line object | A single JSON array of entries (pretty-printed or not), an object wrapping one (`{"logs": [ … ]}`, `{"value": [ … ]}`: the first array of objects is used), or a lone object. Each entry is a row, handled as JSON lines above; "line" numbers count entries. The document is parsed in memory, so it is limited to 256 MB (save bigger exports as JSON lines). Text that turns out not to be valid JSON is read line by line instead. |
@@ -109,7 +111,7 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 
 ## Features
 
-- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.json`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
+- **File input**: drag-and-drop or picker (several `.log`/`.txt`/`.json`/`.xml`/`.gz`/`.zip` files at once), or pasted text, progress bar while parsing, file name / size /
   rows parsed / lines skipped / detected format / parse time, metadata (`#`) lines, clear errors for wrong type,
   empty, binary or unparseable files. The file bar is one line by default (file, rows, format, time zone);
   *Details* shows size, parse time, metadata lines and where the time zone came from.
@@ -255,6 +257,7 @@ once per distinct URI while building the index). Numbers vary by machine; the te
 - Batches are copied (structured clone) from the worker to the main thread rather than transferred.
 - IIS data without any `#Fields:` header is not auto-detected (it parses as generic text); lines before the first
   `#Fields:` are reported as malformed.
+- Only FREB traces are read as XML; other XML logs (e.g. Windows Event Log exports) are rejected.
 - Generic text detection only recognises ISO-like timestamps at the start of a line (not syslog `Oct 27 …`).
 - Apache detection expects the standard combined/common layout; custom `LogFormat`s fall back to generic text.
 - Sorting runs on the main thread (≈ 0.3 s for a string column at 500k rows in the benchmark).

@@ -2,10 +2,11 @@ import type { LogTimeZone } from './timezone';
 
 export type { LogTimeZone } from './timezone';
 
-export type LogFormat = 'iis' | 'apache' | 'jsonl' | 'generic';
+export type LogFormat = 'iis' | 'freb' | 'apache' | 'jsonl' | 'generic';
 
 export const FORMAT_LABELS: Record<LogFormat, string> = {
   iis: 'IIS W3C Extended',
+  freb: 'IIS failed request trace',
   apache: 'Apache/Nginx combined',
   jsonl: 'JSON lines',
   generic: 'Generic text',
@@ -58,7 +59,10 @@ export interface LogRow {
   /** Epoch milliseconds (UTC), or null if the row has no timestamp. */
   ts: number | null;
   values: Record<string, CellValue>;
-  /** Original line(s) exactly as they appeared in the file. */
+  /**
+   * Original line(s) exactly as they appeared in the file; for an IIS failed request trace,
+   * the request's event timeline as readable text.
+   */
   raw: string;
 }
 

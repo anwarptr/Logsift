@@ -1,4 +1,4 @@
-import { createParser, detectFormat, SOURCE_COLUMN } from '../parser';
+import { createParser, detectFormat, looksLikeXml, SOURCE_COLUMN } from '../parser';
 import type { ColumnDef, LineParser, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
 import { isZipName, listZipEntries, zipEntryData, ZipError } from './unzip';
 
@@ -45,7 +45,7 @@ export class ParseError extends Error {}
 export class CancelledError extends Error {}
 
 /** Accepted inside archives. */
-const LOG_NAME_RE = /\.(log|txt|json|jsonl|ndjson|clef)$/i;
+const LOG_NAME_RE = /\.(log|txt|json|jsonl|ndjson|clef|xml)$/i;
 const GZIP_RE = /\.gz$/i;
 
 /** A whole JSON document (not JSON lines) is parsed in memory, so it is capped. */
@@ -170,7 +170,7 @@ async function expandSources(sources: LogSource[], chunkBytes: number): Promise<
       } catch (e) {
         throw new ParseError(`"${s.name}": ${e instanceof ZipError ? e.message : String(e)}`);
       }
-      if (entries.length === 0) throw new ParseError(`"${s.name}" contains no .log or .txt files.`);
+      if (entries.length === 0) throw new ParseError(`"${s.name}" contains no log files (.log, .txt, .json or .xml).`);
       entries.sort((a, b) => compareNames(a.name, b.name));
       for (const entry of entries) {
         const data = await zipEntryData(s.blob, entry).catch((e: unknown) => {
@@ -289,7 +289,18 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     };
     const feed = (complete: string) => {
       const ls = complete.split('\n');
-      feedLines(ls, () => detectFormat(ls.slice(0, 200)));
+      feedLines(ls, () => {
+        const sample = ls.slice(0, 200);
+        const guess = detectFormat(sample);
+        // Read as plain text, other XML would only produce noise.
+        if (guess !== 'freb' && !opts.format && looksLikeXml(sample)) {
+          throw new ParseError(
+            `${multi ? `"${input.name}"` : 'This file'} is XML, but not an IIS failed request trace (fr*.xml), ` +
+              'the only XML format Logsift reads.',
+          );
+        }
+        return guess;
+      });
     };
     // A JSON document: each entry becomes one JSON line ("line" numbers count entries).
     // Text that isn't valid JSON after all is read line by line instead.

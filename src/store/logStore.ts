@@ -93,7 +93,7 @@ export interface LogState {
   setFileInfoExpanded(expanded: boolean): void;
 }
 
-export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.gz', '.zip'];
+export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.gz', '.zip'];
 
 /** Display name for text pasted instead of a file (also the base of export file names). */
 export const PASTED_NAME = 'pasted-text.txt';
@@ -126,7 +126,7 @@ export function isAcceptedFile(name: string): boolean {
 }
 
 /** Noisy columns that start hidden (they can be shown from the column chooser). */
-const DEFAULT_HIDDEN = new Set(['cs(Cookie)', 'sc-substatus', 'sc-win32-status', 'timestamp_raw']);
+const DEFAULT_HIDDEN = new Set(['cs(Cookie)', 'sc-substatus', 'sc-win32-status', 'timestamp_raw', 'siteId', 'processId', 'activityId']);
 
 export function defaultColumnWidth(col: ColumnDef): number {
   if (col.type === 'timestamp') return 190; // fits "2026-03-14 09:30:01.102"
@@ -285,8 +285,8 @@ export const useLogStore = create<LogState>()((set, get) => {
       if (ok.length === 0) {
         const f = all[0]!;
         let error: string;
-        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .json, .gz or .zip files.';
-        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .json, .gz or .zip file.`;
+        if (all.length > 1) error = 'None of these files can be opened: choose non-empty .log, .txt, .json, .xml, .gz or .zip files.';
+        else if (!isAcceptedFile(f.name)) error = `"${f.name}" is not supported. Choose a .log, .txt, .json, .xml, .gz or .zip file.`;
         else error = `"${f.name}" is empty.`;
         set({ error });
         return;

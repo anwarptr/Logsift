@@ -11,6 +11,8 @@ export function RowDetailPanel() {
   const row = useLogStore((s) => (s.selectedId === null ? undefined : s.rows[s.selectedId]));
   const schema = useLogStore((s) => s.schema);
   const select = useLogStore((s) => s.select);
+  // A failed request trace's raw text is its event timeline, not a line from the file.
+  const isTrace = useLogStore((s) => s.format === 'freb');
   const zone = useDisplayZone();
   const [copied, setCopied] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -25,7 +27,7 @@ export function RowDetailPanel() {
     if (!row) return;
     const text = kind === 'json' ? JSON.stringify(rowToJson(row, schema, zone), null, 2) : row.raw;
     const ok = await copyText(text);
-    setCopied(ok ? (kind === 'json' ? 'Copied JSON' : 'Copied raw line') : 'Copy failed');
+    setCopied(ok ? (kind === 'json' ? 'Copied JSON' : isTrace ? 'Copied timeline' : 'Copied raw line') : 'Copy failed');
   }
 
   return (
@@ -50,7 +52,7 @@ export function RowDetailPanel() {
           Copy as JSON
         </button>
         <button type="button" className="btn small" onClick={() => copy('raw')}>
-          Copy raw line
+          {isTrace ? 'Copy timeline' : 'Copy raw line'}
         </button>
         <span className="muted small-text" role="status" aria-live="polite">
           {copied}
@@ -74,7 +76,7 @@ export function RowDetailPanel() {
           );
         })}
       </dl>
-      <h3>Raw</h3>
+      <h3>{isTrace ? 'Event timeline' : 'Raw'}</h3>
       <pre className="detail-raw">{row.raw}</pre>
     </aside>
   );

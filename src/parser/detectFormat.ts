@@ -15,6 +15,12 @@ function isJsonObject(line: string): boolean {
   }
 }
 
+/** Whether text starts like an XML document (used to reject XML that is not a FREB trace). */
+export function looksLikeXml(lines: readonly string[]): boolean {
+  const first = lines.find((l) => l.trim().length > 0)?.trimStart() ?? '';
+  return first.startsWith('<?xml') || /^<[A-Za-z][\w:.-]*[\s>/]/.test(first);
+}
+
 /** Guess the log format from the first lines of a file. */
 export function detectFormat(lines: readonly string[]): LogFormat {
   const sample: string[] = [];
@@ -25,6 +31,7 @@ export function detectFormat(lines: readonly string[]): LogFormat {
   }
   if (sample.length === 0) return 'generic';
   if (sample.some((l) => l.startsWith('#Software:') || l.startsWith('#Fields:'))) return 'iis';
+  if (sample.some((l) => l.trimStart().startsWith('<failedRequest'))) return 'freb';
 
   const ratio = (pred: (l: string) => boolean) => sample.filter(pred).length / sample.length;
   if (ratio((l) => APACHE_LINE_RE.test(l)) >= MATCH_RATIO) return 'apache';

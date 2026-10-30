@@ -1,12 +1,13 @@
 import { createApacheParser } from './apache';
 import { detectFormat } from './detectFormat';
+import { createFrebParser } from './freb';
 import { createGenericParser } from './generic';
 import { createIisParser } from './iis';
 import { createJsonlParser } from './jsonl';
 import type { LineParser, LogFormat, LogRow, MalformedRow, ParseResult } from './types';
 
 export * from './types';
-export { detectFormat } from './detectFormat';
+export { detectFormat, looksLikeXml } from './detectFormat';
 export { SOURCE_COLUMN } from './schema';
 export { IIS_TIME_ZONE, OffsetTracker, parseZoneSuffix } from './timezone';
 
@@ -14,6 +15,8 @@ export function createParser(format: LogFormat): LineParser {
   switch (format) {
     case 'iis':
       return createIisParser();
+    case 'freb':
+      return createFrebParser();
     case 'apache':
       return createApacheParser();
     case 'jsonl':
