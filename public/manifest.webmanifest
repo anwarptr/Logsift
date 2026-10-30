@@ -1,0 +1,28 @@
+{
+  "name": "Logsift",
+  "short_name": "Logsift",
+  "description": "Sift through server and application logs, right in your browser. Nothing is uploaded.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#2459d6",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "text/plain": [".log", ".txt"],
+        "application/json": [".json", ".jsonl", ".ndjson", ".clef"],
+        "text/xml": [".xml"],
+        "application/gzip": [".gz"],
+        "application/zip": [".zip"]
+      }
+    }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
+}

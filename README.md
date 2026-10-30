@@ -36,6 +36,14 @@ It serves the production build (`vite preview`) on localhost only, so other mach
 leave your PC. Opening `dist\index.html` directly from disk does not work, because browsers block the parser's
 worker on `file://` pages; that's why the launcher runs a small local server.
 
+### Install as an app
+
+In Chrome or Edge, open the site (or the launcher's page) and click the install icon in the address bar (or
+menu → *Install Logsift*). The installed app opens in its own window, works **offline** once it has been opened
+once, and on Windows appears under *Open with* for `.log`, `.txt`, `.json`, `.xml`, `.gz` and `.zip` files.
+A small service worker (`public/sw.js`, production builds only) keeps the app's own files for offline use; it
+never sees log data, since files are read by the page itself. New versions load as soon as there is a connection.
+
 Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml` files (or `.gz`/`.zip` archives of them) anywhere on the page,
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
