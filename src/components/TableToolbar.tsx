@@ -15,6 +15,7 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
   const setSlow = useLogStore((s) => s.setSlowThreshold);
   const hasDuration = useLogStore((s) => s.schema.some((c) => c.role === 'duration'));
   const hasUri = useLogStore((s) => s.schema.some((c) => c.role === 'uri'));
+  const hasMessage = useLogStore((s) => s.schema.some((c) => c.role === 'message'));
   const focusMode = useLogStore((s) => s.focusMode);
   const setFocusMode = useLogStore((s) => s.setFocusMode);
 
@@ -43,6 +44,20 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
             onClick={() => setTab('endpoints')}
           >
             Endpoints
+          </button>
+        )}
+        {hasMessage && (
+          <button
+            type="button"
+            role="tab"
+            id="tab-patterns"
+            aria-selected={tab === 'patterns'}
+            aria-controls="panel-patterns"
+            className="tab"
+            title="Similar messages grouped together"
+            onClick={() => setTab('patterns')}
+          >
+            Patterns
           </button>
         )}
         <button

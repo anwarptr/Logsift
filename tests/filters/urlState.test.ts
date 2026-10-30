@@ -20,6 +20,7 @@ describe('urlState', () => {
       uriMode: 'startsWith',
       uri: '/api',
       endpoint: '/api/products/{id}',
+      pattern: 'Order {n} took {n} ms',
       hideHealthChecks: true,
       hideScm: true,
       onlyErrors: true,

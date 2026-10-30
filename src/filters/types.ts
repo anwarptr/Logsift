@@ -21,6 +21,8 @@ export interface FilterState {
   uri: string;
   /** URI pattern from the Endpoints view (see uriPattern); '' = off. */
   endpoint: string;
+  /** Message pattern from the Patterns view (see messagePatterns); '' = off. */
+  pattern: string;
   hideHealthChecks: boolean;
   hideScm: boolean;
   onlyErrors: boolean;
@@ -38,6 +40,7 @@ export const EMPTY_FILTERS: FilterState = {
   uriMode: 'contains',
   uri: '',
   endpoint: '',
+  pattern: '',
   hideHealthChecks: false,
   hideScm: false,
   onlyErrors: false,

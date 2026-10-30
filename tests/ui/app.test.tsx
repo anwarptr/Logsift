@@ -413,3 +413,32 @@ describe('row details shortcuts', () => {
     act(() => useLogStore.getState().select(null));
   });
 });
+
+describe('patterns view', () => {
+  it('groups similar messages and filters to one on click', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    // IIS logs have no message column, so there is no Patterns tab.
+    expect(screen.queryByRole('tab', { name: 'Patterns' })).toBeNull();
+    const log = [
+      '2026-10-27 04:42:01 INFO Order 12 shipped',
+      '2026-10-27 04:42:02 INFO Order 345 shipped',
+      '2026-10-27 04:42:03 ERROR Payment 9 failed',
+      '2026-10-27 04:42:04 INFO Order 6 shipped',
+    ].join('\n');
+    act(() => useLogStore.getState().loadText(log));
+    await waitFor(() => expect(rowCount()).toBe('4 of 4 rows'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Patterns' }));
+    const table = screen.getByRole('table', { name: 'Message patterns' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows.map((r) => r.querySelector('td')!.textContent)).toEqual(['Order {n} shipped', 'Payment {n} failed']);
+    expect(rows[0]!.textContent).toContain('3');
+
+    fireEvent.click(within(table).getByRole('button', { name: 'Order {n} shipped' }));
+    expect(useLogStore.getState().tab).toBe('rows');
+    expect(rowCount()).toBe('3 of 4 rows');
+    expect(screen.getByRole('button', { name: 'Remove filter Pattern: Order {n} shipped' })).toBeTruthy();
+    act(() => useLogStore.getState().clearFilters());
+  });
+});

@@ -1,4 +1,5 @@
 import type { LogRow } from '../parser';
+import { getPatternIndex } from '../utils/messagePatterns';
 import { FLAG_HEALTH, FLAG_SCM, isErrorRow, type LogIndex } from './logIndex';
 import type { FilterState } from './types';
 
@@ -13,6 +14,7 @@ export const BIT_STATUS = 2;
 export const BIT_URI = 4;
 /** Above the facet bits (shift 3, at most 24 facets → bits 3..26). */
 export const BIT_ENDPOINT = 1 << 30;
+export const BIT_PATTERN = 1 << 29;
 const FACET_BIT_SHIFT = 3;
 
 export interface CompiledSearch {
@@ -144,6 +146,14 @@ export function evaluateFilters(
     const code = index.uriPattern.values.indexOf(f.endpoint);
     const codes = index.uriPattern.codes;
     for (let i = 0; i < n; i++) if (codes[i] !== code) mask[i]! |= BIT_ENDPOINT;
+  }
+
+  // Message pattern, also with its own bit (for the Patterns view). The pattern index is built here on first use.
+  if (f.pattern && index.messageKey) {
+    const pidx = getPatternIndex(rows, index.messageKey);
+    const code = pidx.values.indexOf(f.pattern);
+    const codes = pidx.codes;
+    for (let i = 0; i < n; i++) if (codes[i] !== code) mask[i]! |= BIT_PATTERN;
   }
 
   // Quick toggles.

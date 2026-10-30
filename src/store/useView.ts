@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
-import { BIT_ENDPOINT, compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
+import { BIT_ENDPOINT, BIT_PATTERN, compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
 import { buildLogIndex, type LogIndex } from '../filters/logIndex';
 import type { FilterState } from '../filters/types';
 import type { ColumnDef, LogRow, LogTimeZone } from '../parser';
 import { computeEndpoints, type EndpointStat } from '../utils/endpoints';
 import { computeInsights, type Insights } from '../utils/insights';
+import { computePatterns, getPatternIndex, type PatternStat } from '../utils/messagePatterns';
 import { sortIndices } from '../utils/sort';
 import { logDisplayZone, type DisplayZone } from '../utils/timezone';
 import { useLogStore } from './logStore';
@@ -130,4 +131,19 @@ export function useEndpoints(): EndpointStat[] | null {
   const methodKey = schema.find((c) => c.role === 'method')?.key;
   if (!index?.uriPattern || !ev) return null;
   return getEndpoints(rows, index, ev.mask, methodKey);
+}
+
+const getPatterns = memoLast((rows: LogRow[], index: LogIndex, mask: Uint32Array, levelKey: string | undefined) =>
+  computePatterns(rows, index, getPatternIndex(rows, index.messageKey!), mask, BIT_PATTERN, levelKey),
+);
+
+/** Message patterns over the filtered rows, ignoring the pattern filter itself; null while loading or without messages. */
+export function usePatterns(): PatternStat[] | null {
+  const rows = useLogStore((s) => s.rows);
+  const schema = useLogStore((s) => s.schema);
+  const index = useLogIndex();
+  const ev = useFilterEval();
+  const levelKey = schema.find((c) => c.role === 'level')?.key;
+  if (!index?.messageKey || !ev) return null;
+  return getPatterns(rows, index, ev.mask, levelKey);
 }

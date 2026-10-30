@@ -7,6 +7,7 @@ import { HomePage } from './components/HomePage';
 import { InsightsPanel } from './components/InsightsPanel';
 import { LogTable } from './components/LogTable';
 import { MalformedList } from './components/MalformedList';
+import { PatternsTable } from './components/PatternsTable';
 import { RowDetailPanel } from './components/RowDetailPanel';
 import { SearchBox } from './components/SearchBox';
 import { TableToolbar } from './components/TableToolbar';
@@ -136,6 +137,10 @@ export default function App() {
               ) : tab === 'endpoints' ? (
                 <div role="tabpanel" id="panel-endpoints" aria-labelledby="tab-endpoints" className="tab-panel">
                   <EndpointsTable />
+                </div>
+              ) : tab === 'patterns' ? (
+                <div role="tabpanel" id="panel-patterns" aria-labelledby="tab-patterns" className="tab-panel">
+                  <PatternsTable />
                 </div>
               ) : (
                 <div role="tabpanel" id="panel-malformed" aria-labelledby="tab-malformed" className="tab-panel">

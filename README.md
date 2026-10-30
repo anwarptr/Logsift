@@ -128,6 +128,11 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   Fields that have a filter get an **Only this** link (show only rows with that value: any facet column, or the
   exact URI). With filters on, **Show in full log** clears them for the moment and shows the row among its
   neighbours in file order; a note above the table offers **Restore filters** (changing any filter also ends it).
+- **Patterns** tab (logs with a message column): messages grouped by shape — the first line with GUIDs, dates and
+  times, quoted values, IPs, hex ids and numbers replaced (`Order {n} took {n} ms`). Per pattern: rows, errors, most
+  common level, first and last seen, over the current filters; sortable and searchable. Click one to filter the rows
+  to it (a **Pattern** chip). Patterns are worked out the first time the tab or filter is used, so logs that never
+  use them pay nothing.
 - **Endpoints** tab: requests grouped by URI pattern — lower-cased, trailing `/` dropped, and variable segments
   replaced (numbers → `{id}`, GUIDs → `{guid}`, dates → `{date}`, long hex → `{hash}`, long opaque tokens →
   `{token}`), so `/api/Products/123` and `/api/products/456/` are both `/api/products/{id}`. Per endpoint: methods,
@@ -163,6 +168,7 @@ All filters are generated from the detected schema and the data (not hard-coded 
 | Numeric ranges | Dual sliders + number inputs for duration/bytes columns (`time-taken`, `sc-bytes`, `cs-bytes`) and any other high-cardinality numeric column. Bounds come from the data. |
 | URI | `contains` / `starts with` / `equals` (case-insensitive) on `cs-uri-stem` (or the format's equivalent), plus a top-10 frequent paths list. |
 | Endpoint | One URI pattern, set from the Endpoints tab (see above). |
+| Pattern | One message pattern, set from the Patterns tab (see above). |
 | Quick toggles | Hide health checks, Hide SCM/Kudu, Only errors (status ≥ 400, or ERROR/FATAL level for text/JSON logs), Only slow (duration > threshold). Shown only when the columns exist. |
 
 Active filters appear as removable chips with **Clear all** and an "X of Y rows" count. The full filter state is

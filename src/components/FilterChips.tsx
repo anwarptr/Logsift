@@ -48,6 +48,7 @@ export function buildChips(f: FilterState, slowMs: number, zone: DisplayZone = U
     const mode = f.uriMode === 'startsWith' ? 'starts with' : f.uriMode;
     chips.push({ id: 'uri', label: `URI ${mode} ${f.uri}`, remove: { uri: '' } });
   }
+  if (f.pattern) chips.push({ id: 'pattern', label: `Pattern: ${facetLabel(f.pattern)}`, remove: { pattern: '' } });
   if (f.endpoint) chips.push({ id: 'endpoint', label: `Endpoint: ${facetLabel(f.endpoint)}`, remove: { endpoint: '' } });
   if (f.hideHealthChecks) chips.push({ id: 'hh', label: 'No health checks', remove: { hideHealthChecks: false } });
   if (f.hideScm) chips.push({ id: 'hs', label: 'No SCM/Kudu', remove: { hideScm: false } });

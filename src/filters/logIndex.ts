@@ -56,6 +56,8 @@ export interface LogIndex {
   durationKey: string | null;
   uri: (string | null)[] | null;
   uriKey: string | null;
+  /** Column with the message role; message patterns (see messagePatterns) are built from it on demand. */
+  messageKey: string | null;
   /** URI pattern per row (see uriPattern), dictionary-coded; NULL_KEY for rows without a URI. */
   uriPattern: { codes: Uint32Array; values: string[] } | null;
   /** Bit flags per row: 1 = health check, 2 = SCM, 4 = error level. */
@@ -229,6 +231,7 @@ export function buildLogIndex(rows: readonly LogRow[], schema: ColumnDef[]): Log
     durationKey: durationCol?.key ?? null,
     uri,
     uriKey: uriCol?.key ?? null,
+    messageKey: byRole(schema, 'message')?.key ?? null,
     uriPattern: uriPatternIdx,
     flags,
     hasHealthCheck: !!healthCol,
