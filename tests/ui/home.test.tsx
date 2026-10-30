@@ -15,7 +15,7 @@ describe('HomePage', () => {
     expect(footer.textContent).toContain('Made by Anwar');
     expect(footer.textContent).toContain('MIT license');
     const link = screen.getByRole('link', { name: 'Source on GitHub' });
-    expect(link.getAttribute('href')).toBe('https://github.com/anwar-sobha/LogViewer');
+    expect(link.getAttribute('href')).toBe('https://github.com/anwar-sobha/Logsift');
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
   });

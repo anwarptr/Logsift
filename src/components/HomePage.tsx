@@ -1,6 +1,6 @@
 import { DropZone } from './DropZone';
 
-const REPO_URL = 'https://github.com/anwar-sobha/LogViewer';
+const REPO_URL = 'https://github.com/anwar-sobha/Logsift';
 
 const FORMATS = ['IIS logs & failed request traces', 'Apache / Nginx', 'Serilog', 'JSON', 'Windows Event Log', 'Syslog', 'CSV / TSV', 'Plain text', '.gz / .zip'];
 

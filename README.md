@@ -1,7 +1,12 @@
 # Logsift
 
-Sift through your logs in the browser. Logsift is a client-side web app for exploring IIS W3C, Apache/Nginx,
-JSON-lines and plain-text log files (including Serilog).
+Sift through your logs in the browser. Logsift is a client-side web app for exploring IIS W3C logs and failed
+request traces, Windows Event Log exports, Apache/Nginx, Serilog, JSON, syslog, CSV and plain-text log files.
+
+**Open it: https://logsift.ayzo.app/** — no install or sign-up. It can also be installed as an app that works offline.
+
+![Logsift showing an IIS log: filters on the left, insights and the log table on the right](docs/screenshot.png)
+
 Everything runs in your browser: files are parsed in a Web Worker and **no data leaves the machine**
 (there is no backend and no network call besides loading the app itself).
 
@@ -66,8 +71,8 @@ stay per file, and the row details and Malformed tab show the file name.
 ### Hosted version, CI and deployment
 
 `.github/workflows/ci.yml` runs on every push and pull request: `npm ci`, type check, tests and production build
-(Node 24). On `main`, a green build is then deployed to GitHub Pages at
-**https://anwar-sobha.github.io/LogViewer/**. The site is static: files you open are still parsed only in your
+(Node 24). On `main`, a green build is then deployed to GitHub Pages, served at
+**https://logsift.ayzo.app/** (custom domain; `anwar-sobha.github.io/Logsift/` redirects there). The site is static: files you open are still parsed only in your
 browser. One-time setup: in the repository's **Settings → Pages → Build and deployment**, set **Source** to
 **GitHub Actions** (until then the deploy job fails while the checks still run). The perf benchmark is not part
 of CI (timings on shared runners are too noisy to gate on).
