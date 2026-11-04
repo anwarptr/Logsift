@@ -15,11 +15,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     cancelled.add(msg.jobId);
     return;
   }
-  const { jobId, sources, format } = msg;
+  const { jobId, sources, format, pattern } = msg;
   const started = performance.now();
   try {
     const summary = await streamParseSources(sources, {
       format,
+      pattern,
       isCancelled: () => cancelled.has(jobId),
       onStart: (fmt, detected, files) => post({ type: 'start', jobId, format: fmt, detected, files }),
       onBatch: (batch) => post({ type: 'batch', jobId, ...batch }),

@@ -1,10 +1,12 @@
 import { createApacheParser } from './apache';
 import { createCsvParser } from './csv';
+import { createCustomParser } from './custom';
 import { detectFormat } from './detectFormat';
 import { createFrebParser } from './freb';
 import { createGenericParser } from './generic';
 import { createIisParser } from './iis';
 import { createJsonlParser } from './jsonl';
+import { createLogfmtParser } from './logfmt';
 import { createSyslogParser } from './syslog';
 import { createWinEventParser } from './winevent';
 import type { LineParser, LogFormat, LogRow, MalformedRow, ParseResult } from './types';
@@ -14,7 +16,8 @@ export { detectFormat, looksLikeXml } from './detectFormat';
 export { SOURCE_COLUMN } from './schema';
 export { IIS_TIME_ZONE, OffsetTracker, parseZoneSuffix } from './timezone';
 
-export function createParser(format: LogFormat): LineParser {
+/** `pattern` is the layout for the 'custom' format (see custom.ts). */
+export function createParser(format: LogFormat, pattern?: string): LineParser {
   switch (format) {
     case 'iis':
       return createIisParser();
@@ -26,12 +29,16 @@ export function createParser(format: LogFormat): LineParser {
       return createApacheParser();
     case 'jsonl':
       return createJsonlParser();
+    case 'logfmt':
+      return createLogfmtParser();
     case 'syslog':
       return createSyslogParser();
     case 'csv':
       return createCsvParser();
     case 'generic':
       return createGenericParser();
+    case 'custom':
+      return createCustomParser(pattern ?? '');
   }
 }
 
@@ -48,12 +55,12 @@ export function splitLines(text: string): string[] {
 
 /**
  * Parse a whole text in one go (used by tests and the benchmark; the worker streams instead).
- * `defaultDate` dates lines that carry only a time of day (default: today).
+ * `defaultDate` dates lines that carry only a time of day (default: today); `pattern` is the custom format's layout.
  */
-export function parseText(text: string, format?: LogFormat, defaultDate?: number): ParseResult {
+export function parseText(text: string, format?: LogFormat, defaultDate?: number, pattern?: string): ParseResult {
   const lines = splitLines(text);
   const fmt = format ?? detectFormat(lines.slice(0, 200));
-  const parser = createParser(fmt);
+  const parser = createParser(fmt, pattern);
   if (defaultDate !== undefined) parser.setDefaultDate?.(defaultDate);
   const rows: LogRow[] = [];
   const malformed: MalformedRow[] = [];

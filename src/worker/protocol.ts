@@ -2,7 +2,7 @@ import type { LogFormat, LogTimeZone } from '../parser';
 import type { LogSource, StreamBatch } from './streamParse';
 
 export type WorkerRequest =
-  | { type: 'parse'; jobId: number; sources: LogSource[]; format?: LogFormat }
+  | { type: 'parse'; jobId: number; sources: LogSource[]; format?: LogFormat; pattern?: string }
   | { type: 'cancel'; jobId: number };
 
 export type WorkerResponse =

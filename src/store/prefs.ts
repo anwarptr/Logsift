@@ -13,6 +13,8 @@ export interface Prefs {
   sidebarOpen: boolean;
   /** File bar shows size, parse time, metadata etc. instead of just the essentials. */
   fileInfoExpanded: boolean;
+  /** Layout for the "Custom pattern" format, e.g. "{time} [{thread}] {level} {logger} - {message}". */
+  customPattern: string;
 }
 
 const KEY = 'log-viewer:prefs';
@@ -24,6 +26,7 @@ const DEFAULTS: Prefs = {
   timeDisplay: 'log',
   sidebarOpen: true,
   fileInfoExpanded: false,
+  customPattern: '',
 };
 
 /** Per-browser UI preferences. Storage may be unavailable (private mode), so every access is guarded. */
@@ -41,6 +44,7 @@ export function loadPrefs(): Prefs {
       timeDisplay: p.timeDisplay === 'local' ? 'local' : 'log',
       sidebarOpen: p.sidebarOpen !== false,
       fileInfoExpanded: p.fileInfoExpanded === true,
+      customPattern: typeof p.customPattern === 'string' ? p.customPattern : '',
     };
   } catch {
     return { ...DEFAULTS };

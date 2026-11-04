@@ -1,0 +1,4 @@
+{"level":30,"time":1793076122120,"pid":71,"hostname":"api-1","msg":"server listening","port":3000}
+{"level":30,"time":1793076123481,"pid":71,"hostname":"api-1","req":{"id":1,"method":"GET","url":"/api/users/42","remoteAddress":"203.0.113.7"},"res":{"statusCode":200},"responseTime":12,"msg":"request completed"}
+{"level":50,"time":1793076124007,"pid":71,"hostname":"api-1","req":{"id":2,"method":"POST","url":"/api/orders","remoteAddress":"198.51.100.20"},"res":{"statusCode":500},"responseTime":431,"err":{"type":"Error","message":"db timeout"},"msg":"request errored"}
+{"level":40,"time":1793076125250,"pid":71,"hostname":"api-1","msg":"event loop lag 220ms"}

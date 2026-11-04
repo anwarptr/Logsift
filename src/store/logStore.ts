@@ -34,6 +34,8 @@ export interface LogState {
   format: LogFormat | null;
   detectedFormat: LogFormat | null;
   formatOverride: LogFormat | 'auto';
+  /** Layout used when the format is 'custom' (remembered per browser). */
+  customPattern: string;
   progress: { bytesRead: number; totalBytes: number; lines: number };
   parseMs: number | null;
   rows: LogRow[];
@@ -80,6 +82,8 @@ export interface LogState {
   showInFullLog(id: number): void;
   restoreFilters(): void;
   setFormatOverride(format: LogFormat | 'auto'): void;
+  /** Save a custom pattern and re-parse the current files with it. */
+  setCustomPattern(pattern: string): void;
   setError(message: string | null): void;
 
   setColumnVisible(key: string, visible: boolean): void;
@@ -197,7 +201,8 @@ export const useLogStore = create<LogState>()((set, get) => {
       selectedId: null,
       tab: 'rows',
     });
-    startParse(sources, override === 'auto' ? undefined : override, (msg: WorkerResponse) => {
+    const pattern = override === 'custom' ? get().customPattern : undefined;
+    startParse(sources, override === 'auto' ? undefined : override, pattern, (msg: WorkerResponse) => {
       switch (msg.type) {
         case 'start':
           set({ format: msg.format, detectedFormat: msg.detected, files: msg.files });
@@ -244,6 +249,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     format: null,
     detectedFormat: null,
     formatOverride: 'auto',
+    customPattern: prefs.customPattern,
     progress: { bytesRead: 0, totalBytes: 0, lines: 0 },
     parseMs: null,
     rows: [],
@@ -342,6 +348,12 @@ export const useLogStore = create<LogState>()((set, get) => {
       const { sources, file } = get();
       if (sources.length && file) parse(sources, file, format, false);
       else set({ formatOverride: format });
+    },
+
+    setCustomPattern(pattern) {
+      set({ customPattern: pattern });
+      savePrefs({ customPattern: pattern });
+      get().setFormatOverride('custom');
     },
 
     setError(message) {

@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { FORMAT_LABELS, type LogFormat, type LogTimeZone } from '../parser';
 import { useLogStore } from '../store/logStore';
+import { CustomPatternDialog } from './CustomPatternDialog';
 import { useLogIndex } from '../store/useView';
 import { formatBytes, formatDuration, formatNumber } from '../utils/format';
 import { differsFromLocal, formatOffset, localZoneName, logDisplayZone, zoneOffsetAt } from '../utils/timezone';
@@ -91,6 +93,7 @@ export function FileInfo() {
   const files = useLogStore((s) => s.files);
   const expanded = useLogStore((s) => s.fileInfoExpanded);
   const setExpanded = useLogStore((s) => s.setFileInfoExpanded);
+  const [patternOpen, setPatternOpen] = useState(false);
 
   if (!file) return null;
 
@@ -135,7 +138,12 @@ export function FileInfo() {
               id="format-select"
               value={override}
               disabled={status === 'loading'}
-              onChange={(e) => setOverride(e.target.value as LogFormat | 'auto')}
+              onChange={(e) => {
+                const v = e.target.value as LogFormat | 'auto';
+                // The custom format needs a pattern first; the dialog applies it.
+                if (v === 'custom') setPatternOpen(true);
+                else setOverride(v);
+              }}
             >
               <option value="auto">Auto{detected ? ` (${FORMAT_LABELS[detected]})` : ''}</option>
               {FORMATS.map((f) => (
@@ -145,6 +153,17 @@ export function FileInfo() {
               ))}
             </select>
             {format && override === 'auto' && <span className="visually-hidden">Detected {FORMAT_LABELS[format]}</span>}
+            {override === 'custom' && (
+              <button
+                type="button"
+                className="btn small format-edit"
+                disabled={status === 'loading'}
+                onClick={() => setPatternOpen(true)}
+              >
+                Edit pattern
+              </button>
+            )}
+            {patternOpen && <CustomPatternDialog onClose={() => setPatternOpen(false)} />}
           </dd>
         </div>
         {tz && <TimeZoneInfo tz={tz} expanded={expanded} />}

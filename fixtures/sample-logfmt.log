@@ -1,0 +1,6 @@
+time=2026-10-27T04:42:02.120Z level=INFO msg="server started" addr=:8080
+time=2026-10-27T04:42:03.481Z level=INFO msg=request method=GET path=/api/users/42 status=200 duration=12.5ms remote=203.0.113.7
+time=2026-10-27T04:42:04.007Z level=ERROR msg="request failed" method=POST path=/api/orders status=500 duration=1.2s err="context deadline exceeded" user=007
+goroutine 18 [running]:
+main.handler(0xc000123456)
+time=2026-10-27T04:42:05.250Z level=WARN msg="slow query" query="SELECT * FROM \"orders\"" took=850ms

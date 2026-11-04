@@ -1,3 +1,4 @@
+import { GENERIC_LINE_RE, normalizeLevel, refineEntry } from './generic';
 import { SchemaBuilder, TIMESTAMP_COLUMN } from './schema';
 import { OffsetTracker, parseZoneSuffix } from './timezone';
 import type { CellValue, ColumnRole, LineParser, LogRow, MalformedRow, ParsedChunk } from './types';
@@ -32,7 +33,76 @@ export const KEY_ROLES: Record<string, ColumnRole> = {
   ip: 'clientIp',
   clientip: 'clientIp',
   host: 'host',
+  // Python (python-json-logger), Elastic Common Schema, logstash-logback-encoder.
+  levelname: 'level',
+  'log.level': 'level',
+  logger_name: 'logger',
+  'log.logger': 'logger',
+  status_code: 'status',
+  'http.response.status_code': 'status',
+  'http.request.method': 'method',
+  'url.path': 'uri',
+  'client.ip': 'clientIp',
+  remote_addr: 'clientIp',
+  remote_ip: 'clientIp',
+  duration_ms: 'duration',
+  elapsed_ms: 'duration',
+  latency_ms: 'duration',
+  // pino-http / express request logging (after `req` and `res` are flattened).
+  'req.method': 'method',
+  'req.url': 'uri',
+  'req.remoteaddress': 'clientIp',
+  'res.statuscode': 'status',
+  responsetime: 'duration',
+  response_time: 'duration',
 };
+
+/** pino/bunyan numeric levels. */
+const NUMERIC_LEVELS: Record<number, string> = { 10: 'TRACE', 20: 'DEBUG', 30: 'INFO', 40: 'WARN', 50: 'ERROR', 60: 'FATAL' };
+const LEVEL_KEYS = new Set(['level', 'lvl', 'severity', 'loglevel']);
+
+/** Nested request/response objects whose fields get their own columns ("req.method", "res.statusCode"). */
+const FLATTEN_KEYS = ['req', 'res', 'request', 'response'];
+
+/** A leading level word in container output that has no other layout ("ERROR boom", "[WARN] x"). */
+const LEADING_LEVEL_RE =
+  /^\s*\[?(TRACE|DEBUG|INFORMATION|INFO|NOTICE|WARNING|WARN|ERROR|ERR|FATAL|CRITICAL|CRIT|VERBOSE|DBG|INF|WRN|FTL)\]?(?![A-Za-z])[\s:|-]*/i;
+
+/**
+ * Docker's json-file driver (also `kubectl logs` from it): {"log":"text\n","stream":"stderr","time":"…"}.
+ * The container's own output is in "log": a JSON object there is spread into columns, a text line
+ * is read like a text log (level, logger, message). Returns null for other objects.
+ */
+function fromDocker(rec: Record<string, unknown>): Record<string, unknown> | null {
+  if (typeof rec.log !== 'string' || typeof rec.stream !== 'string' || !('time' in rec)) return null;
+  const text = rec.log.replace(/\r?\n$/, '');
+  const { log: _log, ...out } = rec;
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const inner: unknown = JSON.parse(trimmed);
+      if (isPlainObject(inner)) {
+        for (const k in inner) if (!(k in out)) out[k] = inner[k];
+        return out;
+      }
+    } catch {
+      // Not JSON after all: read it as text.
+    }
+  }
+  const m = GENERIC_LINE_RE.exec(text);
+  if (m) {
+    const e = refineEntry(m[2], m[3], m[4] ?? '');
+    if (e.level) out.level = e.level;
+    if (e.logger) out.logger = e.logger;
+    Object.assign(out, e.extra);
+    out.message = e.message;
+  } else {
+    const l = LEADING_LEVEL_RE.exec(text);
+    if (l) out.level = normalizeLevel(l[1]!);
+    out.message = l ? text.slice(l[0].length) : text;
+  }
+  return out;
+}
 
 /** Convert a JSON timestamp value (ISO string, epoch seconds or epoch ms) to epoch ms. */
 export function toEpochMs(v: unknown): number | null {
@@ -110,12 +180,26 @@ export function createJsonlParser(): LineParser {
     }
     if (!isPlainObject(obj)) return bad(line, lineNo, 'Not a JSON object');
     let rec = fromClef(obj) ?? obj;
+    rec = fromDocker(rec) ?? rec;
     // Serilog's JsonFormatter nests event properties under "Properties": give each its own column.
     if (isPlainObject(rec.Properties)) {
       const { Properties: props, ...rest } = rec;
       rec = { ...rest };
       for (const k in props) if (!(k in rec)) rec[k] = props[k];
     }
+    // pino-http and similar: {"req":{"method":"GET","url":"/x"},"res":{"statusCode":200}} → "req.method", …
+    for (const fk of FLATTEN_KEYS) {
+      const nested = rec[fk];
+      if (!isPlainObject(nested)) continue;
+      const flat: Record<string, unknown> = {};
+      for (const k in rec) {
+        if (k !== fk) flat[k] = rec[k];
+        else for (const nk in nested) flat[`${fk}.${nk}`] = nested[nk];
+      }
+      rec = flat;
+    }
+    // structlog writes the message as "event".
+    const eventIsMessage = typeof rec.event === 'string' && !('message' in rec) && !('msg' in rec);
     let tsKey: string | undefined;
     for (const k of TIMESTAMP_KEYS) {
       if (k in rec) {
@@ -139,9 +223,11 @@ export function createJsonlParser(): LineParser {
       if (raw === null || raw === undefined) v = null;
       else if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') v = raw;
       else v = JSON.stringify(raw);
+      const lower = k.toLowerCase();
+      if (typeof v === 'number' && LEVEL_KEYS.has(lower) && NUMERIC_LEVELS[v]) v = NUMERIC_LEVELS[v]!;
       // Avoid clobbering the synthetic timestamp column with an unrelated "timestamp" key.
       const key = k === 'timestamp' ? 'timestamp_raw' : k;
-      schema.observe(key, v, KEY_ROLES[k.toLowerCase()]);
+      schema.observe(key, v, eventIsMessage && k === 'event' ? 'message' : KEY_ROLES[lower]);
       values[key] = v;
     }
     rows.push({ id: rowId++, lineNo, ts, values, raw: line });

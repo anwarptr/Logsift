@@ -23,10 +23,15 @@ function getWorker(): Worker {
 }
 
 /** Start parsing files in the worker, cancelling any job in flight. */
-export function startParse(sources: LogSource[], format: LogFormat | undefined, onMessage: Handler): void {
+export function startParse(
+  sources: LogSource[],
+  format: LogFormat | undefined,
+  pattern: string | undefined,
+  onMessage: Handler,
+): void {
   const w = getWorker();
   if (currentJob) w.postMessage({ type: 'cancel', jobId: currentJob } satisfies WorkerRequest);
   currentJob++;
   currentHandler = onMessage;
-  w.postMessage({ type: 'parse', jobId: currentJob, sources, format } satisfies WorkerRequest);
+  w.postMessage({ type: 'parse', jobId: currentJob, sources, format, pattern } satisfies WorkerRequest);
 }

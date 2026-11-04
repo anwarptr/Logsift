@@ -497,6 +497,60 @@ input[type='checkbox'] {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
+/* ---------- Custom pattern dialog ---------- */
+.pattern-input {
+  width: 100%;
+  padding: 8px;
+  font: 13px/1.4 var(--mono);
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pattern-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.pattern-input[aria-invalid='true'] {
+  border-color: var(--err);
+}
+.pattern-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.modal p.error-text {
+  color: var(--err);
+}
+.pattern-preview {
+  overflow: auto;
+  max-height: 40vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pattern-preview table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+.pattern-preview th,
+.pattern-preview td {
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.pattern-preview th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.format-edit {
+  margin-left: 6px;
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

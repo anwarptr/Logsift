@@ -5,11 +5,13 @@ const FORMATS: [name: string, text: ReactNode][] = [
   ['IIS W3C logs', <>u_ex*.log files with a <code>#Fields:</code> header (also from Azure App Service).</>],
   ['IIS failed request traces', <>fr*.xml files: one row per failed request, with its event timeline in the row details.</>],
   ['Windows Event Log', <>XML exports from Event Viewer, wevtutil or Azure's eventlog.xml: one row per event.</>],
-  ['Apache / Nginx', 'Access logs in the combined or common format.'],
-  ['Serilog and text logs', <>Lines starting with a date and time (or just a time, like <code>[11:54:02 INF]</code>); stack traces stay with their entry.</>],
-  ['JSON', 'JSON lines (one object per line), a JSON array, and Serilog JSON (CLEF).'],
+  ['Apache / Nginx', 'Access logs in the combined or common format, and Nginx error logs.'],
+  ['Text logs', <>Lines starting with a date and time (or just a time, like <code>[11:54:02 INF]</code>): Serilog, Python logging, logback/log4j, Spring Boot and similar. Stack traces stay with their entry.</>],
+  ['JSON', 'JSON lines (one object per line), a JSON array, Serilog JSON (CLEF), pino/bunyan, and Docker container logs.'],
+  ['logfmt', <><code>key=value</code> lines, as written by Go (slog, logrus), Heroku and Loki.</>],
   ['Syslog', <>Linux and device logs like <code>Oct 27 04:42:03 host app[123]: message</code>.</>],
   ['CSV / TSV', 'Exports with a header row, e.g. from Log Analytics, Application Insights or Excel.'],
+  ['Anything else', <>Choose <b>Custom pattern…</b> in the <b>Format</b> menu and describe a line, like <code>{'{time} [{thread}] {level} {logger} - {message}'}</code>. A preview shows the result before you apply it.</>],
 ];
 
 const SHORTCUTS: [keys: string[], text: string][] = [

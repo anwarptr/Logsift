@@ -21,6 +21,8 @@ export interface StreamBatch {
 export interface StreamParseOptions {
   /** Force a format instead of auto-detecting. */
   format?: LogFormat;
+  /** Layout for the 'custom' format. */
+  pattern?: string;
   chunkBytes?: number;
   batchRows?: number;
   /** `files` are the log files actually parsed (archives expanded), in parse order. */
@@ -274,7 +276,7 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
       if (!parser) {
         detected = guess();
         format = opts.format ?? detected;
-        parser = createParser(format);
+        parser = createParser(format, opts.pattern);
         parser.setDefaultDate?.(input.modified);
         opts.onStart?.(format, detected, files);
       }

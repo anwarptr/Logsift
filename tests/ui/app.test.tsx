@@ -9,7 +9,12 @@ import type { LogSource } from '../../src/worker/streamParse';
 
 // jsdom has no Worker: run the same streaming parser in-process instead (as parse.worker.ts does).
 vi.mock('../../src/worker/client', () => ({
-  startParse: (sources: LogSource[], format: LogFormat | undefined, onMessage: (m: WorkerResponse) => void) => {
+  startParse: (
+    sources: LogSource[],
+    format: LogFormat | undefined,
+    pattern: string | undefined,
+    onMessage: (m: WorkerResponse) => void,
+  ) => {
     void (async () => {
       const { streamParseSources } = await import('../../src/worker/streamParse');
       // jsdom's Blob lacks arrayBuffer()/stream(); real browsers have them, as does Node's Blob.
@@ -26,6 +31,7 @@ vi.mock('../../src/worker/client', () => ({
       try {
         const summary = await streamParseSources(nodeSources, {
           format,
+          pattern,
           onStart: (fmt, detected, files) => onMessage({ type: 'start', jobId: 1, format: fmt, detected, files }),
           onBatch: (batch) => onMessage({ type: 'batch', jobId: 1, ...batch }),
         });
@@ -493,5 +499,42 @@ describe('charts', () => {
     const waterfall = within(details).getByRole('region', { name: 'Where the time went' });
     expect(waterfall.textContent).toContain('ConfigurationValidationModule set the error status');
     act(() => useLogStore.getState().select(null));
+  });
+});
+
+describe('custom pattern', () => {
+  it('previews a pattern on the open log and re-parses with it', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const text = [
+      '2026-10-27 04:42:03.120 | main | ERROR | boom',
+      '  at Foo.bar()',
+      '2026-10-27 04:42:04.120 | worker-1 | INFO | ok',
+    ].join('\n');
+    act(() => useLogStore.getState().loadText(text));
+    await waitFor(() => expect(rowCount()).toBe('2 of 2 rows'));
+
+    fireEvent.change(screen.getByLabelText('Format'), { target: { value: 'custom' } });
+    const dialog = screen.getByRole('dialog', { name: 'Custom log pattern' });
+    const input = within(dialog).getByLabelText('Pattern');
+    fireEvent.change(input, { target: { value: '{time} | {thread} | {level' } });
+    expect(dialog.textContent).toContain('is not paired');
+    expect((within(dialog).getByRole('button', { name: 'Use pattern' }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(input, { target: { value: '{time} | {thread} | {level} | {message}' } });
+    expect(dialog.textContent).toContain('2 entries in the first 3 lines');
+    expect(within(dialog).getByRole('columnheader', { name: 'thread' })).toBeTruthy();
+    expect(within(dialog).getByRole('cell', { name: 'worker-1' })).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Use pattern' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(useLogStore.getState().format).toBe('custom'));
+    await waitFor(() => expect(rowCount()).toBe('2 of 2 rows'));
+    expect(useLogStore.getState().rows[0]!.values).toMatchObject({ thread: 'main', level: 'ERROR' });
+    expect(useLogStore.getState().customPattern).toBe('{time} | {thread} | {level} | {message}');
+    expect(screen.getByRole('button', { name: 'Edit pattern' })).toBeTruthy();
+
+    act(() => useLogStore.getState().setFormatOverride('auto'));
+    await waitFor(() => expect(useLogStore.getState().format).toBe('generic'));
   });
 });
