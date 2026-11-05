@@ -10,6 +10,7 @@ import { computePatterns, getPatternIndex, type PatternStat } from '../utils/mes
 import { sortIndices } from '../utils/sort';
 import { logDisplayZone, type DisplayZone } from '../utils/timezone';
 import { useLogStore } from './logStore';
+import { setIndexBuildMs } from './perfStats';
 import type { TimeDisplay } from './prefs';
 
 /**
@@ -27,7 +28,12 @@ function memoLast<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) =
   };
 }
 
-const getIndex = memoLast((rows: LogRow[], schema: ColumnDef[]) => buildLogIndex(rows, schema));
+const getIndex = memoLast((rows: LogRow[], schema: ColumnDef[]) => {
+  const started = performance.now();
+  const index = buildLogIndex(rows, schema);
+  setIndexBuildMs(performance.now() - started);
+  return index;
+});
 const getEval = memoLast((rows: LogRow[], index: LogIndex, filters: FilterState, slowThresholdMs: number) =>
   evaluateFilters(rows, index, filters, { slowThresholdMs }),
 );

@@ -75,7 +75,15 @@ export function HelpDialog() {
             <ul>
               <li>Drop files anywhere on the page, use <b>Open files…</b>, or paste text (<b>Paste text…</b> or Ctrl+V).</li>
               <li>Several files open as one log in time order, with a <i>source file</i> column. <code>.gz</code> and <code>.zip</code> files are unpacked for you.</li>
-              <li>The format is detected automatically; if it guesses wrong, pick one in the <b>Format</b> menu in the file bar.</li>
+              <li>The format is detected automatically; if it guesses wrong, pick one in the <b>Format</b> menu in the file bar. Still wrong? <b>Read wrongly?</b> next to it reports the log (with IPs, e-mails and tokens masked) so the format can be added.</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Watch logs live</h3>
+            <ul>
+              <li><b>Open folder…</b> (Chrome, Edge) opens the log files in a folder and its sub-folders, newest first, and keeps watching it: lines written to the files and new files appear as they arrive. You can also drop a folder on the page.</li>
+              <li>The live bar shows what is watched. <b>Follow</b> keeps the newest row in view (scroll up to stop, scroll to the end to resume); <b>Pause</b> and <b>Stop</b> do what they say. Filters, counts and charts update with the new rows.</li>
+              <li>The folder is remembered: <b>Reopen</b> on the start page opens it again after the browser asks for permission. Files opened with <i>Open with → Logsift</i> in the installed app are watched too.</li>
             </ul>
           </section>
 

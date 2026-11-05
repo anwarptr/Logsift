@@ -103,6 +103,13 @@ export interface LineParser {
    * Called before each file; parsers whose lines always have a date ignore it.
    */
   setDefaultDate?(ms: number): void;
+  /**
+   * Per-file state that lines appended to a file later need (the CSV header, the IIS #Fields).
+   * Live tail saves it after a file's lines and restores it (undefined: a new file) before more
+   * lines of that file, since files of a folder take turns on one parser.
+   */
+  fileState?(): unknown;
+  restoreFileState?(state: unknown): void;
 }
 
 export interface ParseResult {

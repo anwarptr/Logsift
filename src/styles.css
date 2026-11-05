@@ -596,6 +596,50 @@ input[type='checkbox'] {
   padding-top: 4px;
   padding-bottom: 4px;
 }
+
+/* ---------- Live bar ---------- */
+.live-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 4px 16px;
+  font-size: 13px;
+  background: var(--ok-bg);
+  border-bottom: 1px solid var(--border);
+}
+.live-bar.paused {
+  background: var(--muted-bg);
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+.live-bar.paused .live-dot {
+  background: var(--fg-muted);
+  animation: none;
+}
+@keyframes live-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+.live-notice {
+  font-size: 12px;
+}
+.live-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
 .file-info-toggle {
   margin-left: auto;
   color: var(--fg-muted);
@@ -748,4 +792,33 @@ input[type='checkbox'] {
     grid-template-columns: 1fr;
     gap: 0;
   }
+}
+
+.dropzone-reopen {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+/* ---------- Report dialog ---------- */
+.report-dialog label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.report-lines {
+  min-height: 160px;
+  height: 30vh;
+  resize: vertical;
+  padding: 8px;
+  font: 12px/1.5 var(--mono);
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.report-lines:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.report-dialog a.btn {
+  text-decoration: none;
 }

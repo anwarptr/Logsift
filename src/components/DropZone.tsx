@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import sampleIis from '../../fixtures/sample-iis.log?raw';
+import { canOpenFolders, ensureReadPermission, loadSavedFolder, pickFolder } from '../live/savedFolder';
+import type { LiveDirHandle } from '../live/watcher';
 import { ACCEPTED_EXTENSIONS, useLogStore } from '../store/logStore';
 import { formatBytes, formatNumber } from '../utils/format';
 import { isEditable } from '../utils/useShortcuts';
@@ -16,6 +18,35 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pasting, setPasting] = useState(false);
+  const openFolder = useLogStore((s) => s.openFolder);
+  const setError = useLogStore((s) => s.setError);
+  const [savedFolder, setSavedFolder] = useState<LiveDirHandle | null>(null);
+  const folders = canOpenFolders();
+
+  useEffect(() => {
+    if (!folders) return;
+    let alive = true;
+    void loadSavedFolder().then((d) => alive && setSavedFolder(d));
+    return () => {
+      alive = false;
+    };
+  }, [folders]);
+
+  const chooseFolder = async () => {
+    try {
+      const dir = await pickFolder();
+      if (dir) {
+        setSavedFolder(dir);
+        await openFolder(dir);
+      }
+    } catch (e) {
+      setError(`Could not open the folder: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const reopenFolder = async (dir: LiveDirHandle) => {
+    if (await ensureReadPermission(dir)) await openFolder(dir);
+    else setError(`Logsift needs permission to read "${dir.name}". Choose the folder again with Open folder….`);
+  };
 
   // Accept drops anywhere on the window, not only on the visible zone.
   useEffect(() => {
@@ -38,8 +69,24 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) loadFiles(files);
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      // Read synchronously: the drop data is gone once this handler returns.
+      const files = Array.from(dt.files);
+      const items = Array.from(dt.items).filter((i) => i.kind === 'file') as (DataTransferItem & {
+        getAsFileSystemHandle?(): Promise<{ kind: string } | null>;
+      })[];
+      const handles = items.map((i) => i.getAsFileSystemHandle?.());
+      if (handles.some((h) => h !== undefined)) {
+        // A dropped folder is opened and watched; dropped files open as before.
+        void Promise.all(handles.map((h) => h?.catch(() => null))).then((hs) => {
+          const dir = hs.find((h) => h?.kind === 'directory') as LiveDirHandle | undefined;
+          if (dir) void openFolder(dir);
+          else if (files.length > 0) loadFiles(files);
+        });
+      } else if (files.length > 0) {
+        loadFiles(files);
+      }
     };
     // Ctrl+V anywhere outside a text field loads the clipboard (copied files or plain text).
     const onPaste = (e: ClipboardEvent) => {
@@ -63,7 +110,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       window.removeEventListener('drop', onDrop);
       window.removeEventListener('paste', onPaste);
     };
-  }, [loadFiles, loadText]);
+  }, [loadFiles, loadText, openFolder]);
 
   const input = (
     <input
@@ -84,7 +131,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
 
   const overlay = dragging && (
     <div className="drop-overlay" aria-hidden="true">
-      <div>Drop log files (.log, .txt, .json, .xml, .csv, .gz, .zip) to open them</div>
+      <div>Drop log files (.log, .txt, .json, .xml, .csv, .gz, .zip){folders ? ' or a folder' : ''} to open them</div>
     </div>
   );
 
@@ -95,12 +142,24 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
   );
   const pasteDialog = pasting && <PasteDialog onClose={() => setPasting(false)} />;
 
+  const folderButton = folders && (
+    <button
+      type="button"
+      className="btn"
+      title="Open the log files in a folder and watch it for new lines (Chrome, Edge)"
+      onClick={() => void chooseFolder()}
+    >
+      Open folder…
+    </button>
+  );
+
   if (compact) {
     return (
       <>
         <button type="button" className="btn" onClick={() => inputRef.current?.click()}>
           Open files…
         </button>
+        {folderButton}
         {pasteButton}
         {input}
         {overlay}
@@ -127,11 +186,20 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
         <button type="button" className="btn primary" onClick={() => inputRef.current?.click()}>
           Choose files…
         </button>
+        {folderButton}
         {pasteButton}
         <button type="button" className="btn" onClick={loadSample}>
           Load sample data
         </button>
       </div>
+      {savedFolder && (
+        <p className="dropzone-reopen">
+          <button type="button" className="btn small" onClick={() => void reopenFolder(savedFolder)}>
+            Reopen {savedFolder.name}/
+          </button>{' '}
+          <span className="muted">and keep watching it for new lines</span>
+        </p>
+      )}
       {input}
       {overlay}
       {pasteDialog}

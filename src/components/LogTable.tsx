@@ -82,6 +82,21 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
     virtualizer.measure();
   }, [rowHeight, virtualizer]);
 
+  // Live tail: keep the newest row in view; scrolling up stops following, scrolling to the end resumes it.
+  const live = useLogStore((s) => s.live !== null);
+  const followSetting = useLogStore((s) => s.live?.following === true);
+  const following = followSetting && sort === null;
+  const setFollowing = useLogStore((s) => s.setLiveFollowing);
+  useEffect(() => {
+    if (following && indices.length > 0) virtualizer.scrollToIndex(indices.length - 1, { align: 'end' });
+  }, [following, indices.length, virtualizer]);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!live || sort !== null || !el) return;
+    const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight <= rowHeight * 2;
+    if (atEnd !== followSetting) setFollowing(atEnd);
+  };
+
   // Keep the cursor in range when the view shrinks.
   useEffect(() => {
     if (cursor >= indices.length) setCursor(Math.max(0, indices.length - 1));
@@ -180,6 +195,7 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
       aria-activedescendant={activeId !== undefined ? `row-${activeId}` : undefined}
       tabIndex={0}
       onKeyDown={onKeyDown}
+      onScroll={onScroll}
     >
       <div className="thead" role="rowgroup" style={{ width: totalWidth }}>
         <div className="tr header" role="row" aria-rowindex={1}>

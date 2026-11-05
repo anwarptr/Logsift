@@ -7,6 +7,7 @@ import { FilterSidebar } from './components/FilterSidebar';
 import { HelpDialog } from './components/HelpDialog';
 import { HomePage } from './components/HomePage';
 import { InsightsPanel } from './components/InsightsPanel';
+import { LiveBar } from './components/LiveBar';
 import { LogTable } from './components/LogTable';
 import { MalformedList } from './components/MalformedList';
 import { PatternsTable } from './components/PatternsTable';
@@ -80,6 +81,7 @@ export default function App() {
       {hasData ? (
         <main className="app-main">
           {!focus && <FileInfo />}
+          <LiveBar />
           <div className="workspace">
             {!focus &&
               (sidebarOpen ? (

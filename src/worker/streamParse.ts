@@ -1,5 +1,5 @@
 import { createParser, detectFormat, looksLikeXml, SOURCE_COLUMN } from '../parser';
-import type { ColumnDef, LineParser, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
+import type { ColumnDef, LineParser, LogFormat, LogRow, LogTimeZone, MalformedRow, ParsedChunk } from '../parser';
 import { isZipName, listZipEntries, zipEntryData, ZipError } from './unzip';
 
 export const CHUNK_BYTES = 4 * 1024 * 1024;
@@ -30,6 +30,10 @@ export interface StreamParseOptions {
   onBatch(batch: StreamBatch): void;
   onProgress?(bytesRead: number, totalBytes: number, lines: number): void;
   isCancelled?(): boolean;
+  /** Keep the parser for `appendToSession`, and hold back each plain file's unfinished last line. */
+  live?: boolean;
+  /** Give rows a `sourceFile` value even for one file (a folder may get more files later). */
+  multi?: boolean;
 }
 
 export interface StreamParseSummary {
@@ -41,6 +45,9 @@ export interface StreamParseSummary {
   rows: number;
   malformed: number;
   timeZone: LogTimeZone;
+  /** Live: bytes of each file's unfinished last line, not read yet (by file name). */
+  held?: Record<string, number>;
+  session?: LiveSession;
 }
 
 export class ParseError extends Error {}
@@ -114,6 +121,8 @@ interface Input {
   name: string;
   /** Modified time of the file (or the archive it came from); dates time-only log lines. */
   modified: number;
+  /** Read as is (not from an archive or .gz), so bytes appended to it later can be read too. */
+  plain?: boolean;
   chunks(): AsyncGenerator<Chunk>;
 }
 
@@ -188,7 +197,7 @@ async function expandSources(sources: LogSource[], chunkBytes: number): Promise<
     } else if (GZIP_RE.test(s.name)) {
       inputs.push({ name: s.name.replace(GZIP_RE, ''), modified, chunks: () => decompressChunks(s.name, s.blob, 'gzip') });
     } else {
-      inputs.push({ name: s.name, modified, chunks: () => sliceChunks(s.blob, chunkBytes) });
+      inputs.push({ name: s.name, modified, plain: true, chunks: () => sliceChunks(s.blob, chunkBytes) });
     }
   }
   return inputs;
@@ -214,7 +223,10 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
 
   const inputs = await expandSources(sources, chunkBytes);
   const files = inputs.map((i) => i.name);
-  const multi = inputs.length > 1;
+  const multi = opts.multi ?? inputs.length > 1;
+  const held: Record<string, number> = {};
+  const lineNos = new Map<string, number>();
+  const fileStates = new Map<string, unknown>();
 
   let parser: LineParser | null = null;
   let format: LogFormat = 'generic';
@@ -366,10 +378,16 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
       addDocText(rest);
       feedDocument(docParts.join(''));
     } else if (started) {
-      feed(rest);
+      // Live: an unfinished last line is still being written; it is read with the next append.
+      // (Nothing after the final newline is not a line, so it isn't counted either.)
+      if (opts.live && input.plain && rest !== '' && parser) held[input.name] = utf8Length(rest);
+      else if (rest !== '' || !parser) feed(rest);
     }
+    // Before finish(), which resets it for the next file.
+    if (opts.live) fileStates.set(input.name, (parser as LineParser | null)?.fileState?.());
     emit(true);
     progress(true);
+    lineNos.set(input.name, lineNo);
   }
 
   if (!parser) throw new ParseError(multi ? 'The files are empty.' : 'The file is empty.');
@@ -386,5 +404,82 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     rows: totalRows,
     malformed: totalMalformed,
     timeZone: p.timeZone(),
+    ...(opts.live ? { held, session: { parser: p, multi, lineNos, fileStates, openFile: null } } : {}),
   };
+}
+
+const utf8Length = (s: string) => new TextEncoder().encode(s).length;
+
+/** The state kept after a live parse, so lines appended to the files later continue the same log. */
+export interface LiveSession {
+  parser: LineParser;
+  /** Rows get a `sourceFile` value (several files, or a folder). */
+  multi: boolean;
+  /** Lines read so far per file, to number appended lines. */
+  lineNos: Map<string, number>;
+  /** Each file's parser state (CSV header, IIS #Fields), as `LineParser.fileState` gave it. */
+  fileStates: Map<string, unknown>;
+  /** The file whose last entry is still open (more lines of it may follow), or null. */
+  openFile: string | null;
+}
+
+/**
+ * Parse bytes appended to a file (or a new file) of a live session. Only complete lines are read:
+ * returns how many bytes were consumed (up to and including the last newline); the rest is read again
+ * with the next append. The file's last entry stays open, so a stack trace written a moment after its
+ * line still joins it; it is closed when another file is read or with `final`, which the watcher sends
+ * once the file stops growing: it reads every byte (an unfinished last line included) and closes the
+ * entry. `modified` dates time-only lines in a file seen for the first time.
+ */
+export function appendToSession(
+  session: LiveSession,
+  name: string,
+  bytes: Uint8Array,
+  modified: number,
+  onBatch: (batch: StreamBatch) => void,
+  final = false,
+): { consumed: number; timeZone: LogTimeZone } {
+  const { parser } = session;
+  const schema = () => (session.multi ? [...parser.schema(), SOURCE_COLUMN] : parser.schema());
+  const emit = (file: string, chunk: ParsedChunk) => {
+    if (session.multi) {
+      for (const r of chunk.rows) r.values.sourceFile = file;
+      for (const m of chunk.malformed) m.file = file;
+    }
+    if (chunk.rows.length || chunk.malformed.length || chunk.meta.length) onBatch({ ...chunk, schema: schema() });
+  };
+  /** Close the open file's last entry, keeping its state for later lines. */
+  const close = (file: string) => {
+    session.fileStates.set(file, parser.fileState?.());
+    emit(file, parser.finish());
+    session.openFile = null;
+  };
+
+  const end = final ? bytes.length : bytes.lastIndexOf(10) + 1;
+  if (end === 0 && !final) return { consumed: 0, timeZone: parser.timeZone() };
+  if (session.openFile !== null && session.openFile !== name) close(session.openFile);
+  let lineNo = session.lineNos.get(name);
+  if (session.openFile !== name) {
+    if (lineNo === undefined) parser.setDefaultDate?.(modified);
+    parser.restoreFileState?.(session.fileStates.get(name));
+  }
+  lineNo ??= 0;
+  if (end > 0) {
+    let text = new TextDecoder('utf-8').decode(bytes.subarray(0, end));
+    if (text.endsWith('\n')) text = text.slice(0, -1);
+    if (lineNo === 0 && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    for (const raw of text.split('\n')) {
+      const l = raw.charCodeAt(raw.length - 1) === 13 ? raw.slice(0, -1) : raw;
+      parser.pushLine(l, ++lineNo);
+    }
+  }
+  session.lineNos.set(name, lineNo);
+  if (final) {
+    close(name);
+  } else {
+    session.fileStates.set(name, parser.fileState?.());
+    session.openFile = name;
+    emit(name, parser.drain());
+  }
+  return { consumed: end, timeZone: parser.timeZone() };
 }

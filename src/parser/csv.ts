@@ -246,5 +246,27 @@ export function createCsvParser(): LineParser {
     return drain();
   }
 
-  return { format: 'csv', pushLine, drain, finish, schema: () => schema.list(), timeZone: () => zones.result() };
+  interface CsvFileState {
+    header: string[] | null;
+    delim: string;
+    timeIndex: number;
+    timeIsUtc: boolean;
+  }
+
+  return {
+    format: 'csv',
+    pushLine,
+    drain,
+    finish,
+    schema: () => schema.list(),
+    timeZone: () => zones.result(),
+    fileState: (): CsvFileState => ({ header, delim, timeIndex, timeIsUtc }),
+    restoreFileState: (state) => {
+      const s = state as CsvFileState | undefined;
+      header = s?.header ?? null;
+      delim = s?.delim ?? ',';
+      timeIndex = s?.timeIndex ?? -1;
+      timeIsUtc = s?.timeIsUtc ?? false;
+    },
+  };
 }

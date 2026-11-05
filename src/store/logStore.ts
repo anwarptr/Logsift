@@ -2,7 +2,19 @@ import { create } from 'zustand';
 import { EMPTY_FILTERS, type FilterState } from '../filters/types';
 import { hasActiveFilters, parseFilters } from '../filters/urlState';
 import type { ColumnDef, LogFormat, LogRow, LogTimeZone, MalformedRow } from '../parser';
-import { startParse } from '../worker/client';
+import {
+  chooseRecent,
+  isTailable,
+  listFolder,
+  LiveWatcher,
+  type FolderEntry,
+  type LiveDirHandle,
+  type LiveFileHandle,
+  type WatchTarget,
+} from '../live/watcher';
+import { saveFolder } from '../live/savedFolder';
+import { appendLive, startParse } from '../worker/client';
+import { liveCheckDelayMs } from './perfStats';
 import type { WorkerResponse } from '../worker/protocol';
 import type { LogSource } from '../worker/streamParse';
 import { loadPrefs, savePrefs, type Density, type ThemePref, type TimeDisplay } from './prefs';
@@ -19,6 +31,36 @@ export interface FileMeta {
 export interface SortState {
   key: string;
   dir: SortDir;
+}
+
+/** What a live load watches: a folder (and new files in it) or files opened with "Open with". */
+interface LiveInit {
+  kind: 'folder' | 'files';
+  /** Folder or file name, for the live bar. */
+  label: string;
+  dir: LiveDirHandle | null;
+  /** Handle of each opened file, by source name. */
+  handles: Map<string, LiveFileHandle>;
+  /** Files of the folder left out on purpose (older ones): not watched. */
+  ignore: Set<string>;
+  notice?: string;
+}
+
+/** Live tail status, shown in the live bar. */
+export interface LiveState {
+  kind: 'folder' | 'files';
+  label: string;
+  /** Files being watched. */
+  files: number;
+  paused: boolean;
+  /** The table keeps the newest row in view (turned off by scrolling up). */
+  following: boolean;
+  /** When new lines last arrived. */
+  updatedAt: number | null;
+  /** Rows added since the files were opened. */
+  newRows: number;
+  notice: string | null;
+  error: string | null;
 }
 
 export interface LogState {
@@ -44,6 +86,8 @@ export interface LogState {
   schema: ColumnDef[];
   /** Detected once parsing finishes. */
   logTimeZone: LogTimeZone | null;
+  /** Set while files are watched for new lines (a folder, or files opened with "Open with"). */
+  live: LiveState | null;
 
   // --- view ---
   columnOrder: string[];
@@ -75,6 +119,13 @@ export interface LogState {
   loadFiles(files: Iterable<File>): void;
   /** Parse pasted text exactly like a file (same worker pipeline). */
   loadText(text: string): void;
+  /** Open the log files in a folder (newest first, within limits) and watch it for new lines and files. */
+  openFolder(dir: LiveDirHandle): Promise<void>;
+  /** Open files given as handles ("Open with" in the installed app) and watch them for new lines. */
+  openFileHandles(handles: LiveFileHandle[]): Promise<void>;
+  stopLive(): void;
+  setLivePaused(paused: boolean): void;
+  setLiveFollowing(following: boolean): void;
   setFilters(patch: Partial<FilterState>): void;
   replaceFilters(f: FilterState): void;
   clearFilters(): void;
@@ -131,6 +182,54 @@ export function mergeByTime(rows: LogRow[]): LogRow[] {
   return sorted;
 }
 
+/** Add rows at the end, numbering them by position. */
+function appendRows(rows: LogRow[], added: LogRow[]): LogRow[] {
+  if (added.length === 0) return rows;
+  const out = rows.concat(added);
+  for (let i = rows.length; i < out.length; i++) out[i]!.id = i;
+  return out;
+}
+
+/**
+ * Merge new rows into rows already in time order (live tail of several files): only the part from
+ * the first new row's time on is merged, so the usual case (all new rows are newest) is an append.
+ * Stable, rows without a timestamp go last (as in `mergeByTime`); ids are renumbered from the merge point.
+ */
+export function mergeAppend(rows: LogRow[], added: LogRow[]): LogRow[] {
+  if (added.length === 0) return rows;
+  const key = (r: LogRow) => r.ts ?? Infinity;
+  const sorted = [...added].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  const first = key(sorted[0]!);
+  // First existing row later than the earliest new row.
+  let lo = 0;
+  let hi = rows.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (key(rows[mid]!) <= first) lo = mid + 1;
+    else hi = mid;
+  }
+  const out = rows.slice(0, lo);
+  let i = lo;
+  let j = 0;
+  while (i < rows.length && j < sorted.length) out.push(key(sorted[j]!) < key(rows[i]!) ? sorted[j++]! : rows[i++]!);
+  while (i < rows.length) out.push(rows[i++]!);
+  while (j < sorted.length) out.push(sorted[j++]!);
+  for (let k = lo; k < out.length; k++) out[k]!.id = k;
+  return out;
+}
+
+/** Read a file from its handle into memory, retrying when it changes while being read. */
+async function readStable(handle: LiveFileHandle): Promise<File> {
+  for (let attempt = 0; ; attempt++) {
+    const file = await handle.getFile();
+    try {
+      return new File([await file.arrayBuffer()], file.name, { lastModified: file.lastModified });
+    } catch (e) {
+      if (attempt >= 4) throw e;
+    }
+  }
+}
+
 export function isAcceptedFile(name: string): boolean {
   const lower = name.toLowerCase();
   return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
@@ -174,7 +273,94 @@ export const useLogStore = create<LogState>()((set, get) => {
     return { columnOrder: [...s.columnOrder, ...added.map((c) => c.key)], hiddenColumns: hidden, columnWidths: widths };
   }
 
-  function parse(sources: LogSource[], file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean) {
+  // --- live tail ---
+  /** What is being watched, kept so a re-parse (format change) can watch it again. */
+  let liveInit: LiveInit | null = null;
+  let watcher: LiveWatcher | null = null;
+  /** Rows read by the watcher during one check, added to the log together (one index rebuild). */
+  let liveBuffer: { rows: LogRow[]; malformed: MalformedRow[]; meta: string[]; schema: ColumnDef[] | null } | null = null;
+  let pendingAppend: ((consumed: number) => void) | null = null;
+
+  function stopWatcher() {
+    watcher?.stop();
+    watcher = null;
+    liveBuffer = null;
+    pendingAppend?.(0);
+    pendingAppend = null;
+  }
+
+  /** Add what the last check read to the log. */
+  function commitLive() {
+    const buf = liveBuffer;
+    if (!buf || (buf.rows.length === 0 && buf.malformed.length === 0 && buf.meta.length === 0)) return;
+    liveBuffer = { rows: [], malformed: [], meta: [], schema: null };
+    const s = get();
+    // Rows of several files are interleaved by time; keep the selection on the same row.
+    const selected = s.selectedId === null ? null : s.rows[s.selectedId];
+    const rows = s.files.length > 1 || liveInit?.kind === 'folder' ? mergeAppend(s.rows, buf.rows) : appendRows(s.rows, buf.rows);
+    const selectedId = selected ? selected.id : s.selectedId;
+    const schema = buf.schema ?? s.schema;
+    set({
+      rows,
+      selectedId,
+      malformed: buf.malformed.length ? s.malformed.concat(buf.malformed) : s.malformed,
+      meta: buf.meta.length ? s.meta.concat(buf.meta) : s.meta,
+      schema,
+      ...syncColumns(schema),
+      live: s.live && { ...s.live, updatedAt: Date.now(), newRows: s.live.newRows + buf.rows.length },
+    });
+  }
+
+  function startWatcher(sources: LogSource[], held: Record<string, number>) {
+    const init = liveInit;
+    if (!init) return;
+    const targets: WatchTarget[] = [];
+    for (const src of sources) {
+      const handle = init.handles.get(src.name);
+      if (handle && isTailable(src.name)) {
+        targets.push({ path: src.name, handle, offset: src.blob.size - (held[src.name] ?? 0), lastSize: src.blob.size });
+      }
+    }
+    liveBuffer = { rows: [], malformed: [], meta: [], schema: null };
+    watcher = new LiveWatcher({
+      dir: init.dir,
+      targets,
+      ignore: init.ignore,
+      accept: isAcceptedFile,
+      delayMs: liveCheckDelayMs,
+      send: (path, blob, modified, final) =>
+        new Promise<number>((resolve) => {
+          pendingAppend = resolve;
+          appendLive(path, blob, modified, final);
+        }),
+      onCheck: () => {
+        commitLive();
+        const s = get();
+        if (s.live && watcher && s.live.files !== watcher.fileCount) set({ live: { ...s.live, files: watcher.fileCount } });
+      },
+      onError: (message) => set((s) => ({ live: s.live && { ...s.live, error: message } })),
+    });
+    watcher.start();
+  }
+
+  function parse(sources: LogSource[], file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean, live?: LiveInit) {
+    stopWatcher();
+    liveInit = live ?? null;
+    set({
+      live: live
+        ? {
+            kind: live.kind,
+            label: live.label,
+            files: sources.length,
+            paused: false,
+            following: true,
+            updatedAt: null,
+            newRows: 0,
+            notice: live.notice ?? null,
+            error: null,
+          }
+        : null,
+    });
     if (resetFilters && !get().keepFiltersOnLoad) set({ filters: EMPTY_FILTERS });
     set({ paused: null });
     set({
@@ -202,12 +388,20 @@ export const useLogStore = create<LogState>()((set, get) => {
       tab: 'rows',
     });
     const pattern = override === 'custom' ? get().customPattern : undefined;
-    startParse(sources, override === 'auto' ? undefined : override, pattern, (msg: WorkerResponse) => {
+    const onMessage = (msg: WorkerResponse) => {
       switch (msg.type) {
         case 'start':
           set({ format: msg.format, detectedFormat: msg.detected, files: msg.files });
           break;
         case 'batch': {
+          if (liveBuffer) {
+            // New lines from the live watcher: collected until its check ends.
+            liveBuffer.rows.push(...msg.rows);
+            liveBuffer.malformed.push(...msg.malformed);
+            liveBuffer.meta.push(...msg.meta);
+            liveBuffer.schema = msg.schema;
+            break;
+          }
           const s = get();
           set({
             rows: msg.rows.length ? s.rows.concat(msg.rows) : s.rows,
@@ -232,12 +426,62 @@ export const useLogStore = create<LogState>()((set, get) => {
             // A file with only malformed lines is still useful: open that tab.
             tab: s.rows.length === 0 && s.malformed.length > 0 ? 'malformed' : s.tab,
           }));
+          if (liveInit) startWatcher(sources, msg.held ?? {});
           break;
+        case 'appended': {
+          const resolve = pendingAppend;
+          pendingAppend = null;
+          if (msg.timeZone && msg.consumed > 0) set({ logTimeZone: msg.timeZone });
+          resolve?.(msg.consumed);
+          break;
+        }
         case 'error':
-          set({ status: 'error', error: msg.message });
+          stopWatcher();
+          set({ status: 'error', error: msg.message, live: null });
           break;
       }
-    });
+    };
+    // A folder may get more files later; otherwise the worker decides (a .zip can hold several).
+    startParse(sources, override === 'auto' ? undefined : override, pattern, onMessage, live ? { multi: live.kind === 'folder' || undefined } : undefined);
+  }
+
+  /** Open files from a folder or from handles, watching them for new lines. */
+  async function openLive(entries: FolderEntry[], init: Omit<LiveInit, 'handles' | 'ignore'>, emptyError: string) {
+    let withFiles: { path: string; handle: LiveFileHandle; file: File }[];
+    try {
+      withFiles = await Promise.all(entries.map(async (e) => ({ ...e, file: await e.handle.getFile() })));
+    } catch (e) {
+      set({ error: `Could not read the files: ${e instanceof Error ? e.message : String(e)}` });
+      return;
+    }
+    const { chosen, skipped } = chooseRecent(withFiles);
+    if (chosen.length === 0) {
+      set({ error: emptyError });
+      return;
+    }
+    // Copy each file now: a File from a handle can't be read once the log is written to again, which
+    // would break a long parse, or a re-parse with another format later.
+    let copies: File[];
+    try {
+      copies = await Promise.all(chosen.map((e) => readStable(e.handle)));
+    } catch (e) {
+      set({ error: `Could not read the files: ${e instanceof Error ? e.message : String(e)}` });
+      return;
+    }
+    const chosenPaths = new Set(chosen.map((e) => e.path));
+    const ignore = new Set(entries.map((e) => e.path).filter((p) => !chosenPaths.has(p)));
+    const size = copies.reduce((sum, f) => sum + f.size, 0);
+    const notice = skipped
+      ? `Opened the ${chosen.length} most recently changed files; ${skipped} older ${skipped === 1 ? 'file was' : 'files were'} left out.`
+      : undefined;
+    const name = init.kind === 'folder' ? `${init.label}/ (${chosen.length} file${chosen.length === 1 ? '' : 's'})` : chosen.length === 1 ? chosen[0]!.path : `${chosen.length} files`;
+    parse(
+      chosen.map((e, i) => ({ name: e.path, blob: copies[i]! })),
+      { name, size },
+      get().formatOverride,
+      true,
+      { ...init, notice, ignore, handles: new Map(chosen.map((e) => [e.path, e.handle])) },
+    );
   }
 
   return {
@@ -257,6 +501,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     meta: [],
     schema: [],
     logTimeZone: null,
+    live: null,
 
     columnOrder: [],
     hiddenColumns: {},
@@ -344,9 +589,54 @@ export const useLogStore = create<LogState>()((set, get) => {
       parse([{ name: PASTED_NAME, blob }], { name: PASTED_NAME, size: blob.size }, get().formatOverride, true);
     },
 
+    async openFolder(dir) {
+      let entries: FolderEntry[];
+      try {
+        entries = await listFolder(dir, isAcceptedFile);
+      } catch (e) {
+        set({ error: `Could not read the folder "${dir.name}": ${e instanceof Error ? e.message : String(e)}` });
+        return;
+      }
+      void saveFolder(dir);
+      await openLive(
+        entries,
+        { kind: 'folder', label: dir.name, dir },
+        `The folder "${dir.name}" has no log files (.log, .txt, .json, .xml, .csv, .gz or .zip) with content.`,
+      );
+    },
+
+    async openFileHandles(handles) {
+      const ok = handles.filter((h) => isAcceptedFile(h.name));
+      if (ok.length === 0) {
+        set({ error: 'None of these files can be opened: choose .log, .txt, .json, .xml, .csv, .gz or .zip files.' });
+        return;
+      }
+      await openLive(
+        ok.map((h) => ({ path: h.name, handle: h })),
+        { kind: 'files', label: ok.length === 1 ? ok[0]!.name : `${ok.length} files`, dir: null },
+        'The files are empty.',
+      );
+    },
+
+    stopLive() {
+      stopWatcher();
+      liveInit = null;
+      set({ live: null });
+    },
+
+    setLivePaused(paused) {
+      watcher?.setPaused(paused);
+      set((s) => ({ live: s.live && { ...s.live, paused } }));
+    },
+
+    setLiveFollowing(following) {
+      set((s) => ({ live: s.live && { ...s.live, following } }));
+    },
+
     setFormatOverride(format) {
       const { sources, file } = get();
-      if (sources.length && file) parse(sources, file, format, false);
+      // Keep watching when the files are re-parsed with another format.
+      if (sources.length && file) parse(sources, file, format, false, liveInit ?? undefined);
       else set({ formatOverride: format });
     },
 

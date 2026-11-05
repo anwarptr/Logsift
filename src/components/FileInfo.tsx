@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FORMAT_LABELS, type LogFormat, type LogTimeZone } from '../parser';
 import { useLogStore } from '../store/logStore';
 import { CustomPatternDialog } from './CustomPatternDialog';
+import { ReportDialog } from './ReportDialog';
 import { useLogIndex } from '../store/useView';
 import { formatBytes, formatDuration, formatNumber } from '../utils/format';
 import { differsFromLocal, formatOffset, localZoneName, logDisplayZone, zoneOffsetAt } from '../utils/timezone';
@@ -94,6 +95,7 @@ export function FileInfo() {
   const expanded = useLogStore((s) => s.fileInfoExpanded);
   const setExpanded = useLogStore((s) => s.setFileInfoExpanded);
   const [patternOpen, setPatternOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   if (!file) return null;
 
@@ -163,7 +165,19 @@ export function FileInfo() {
                 Edit pattern
               </button>
             )}
+            {status === 'ready' && (
+              <button
+                type="button"
+                className="btn small ghost format-edit"
+                aria-haspopup="dialog"
+                title="Tell us about a log Logsift doesn't read correctly"
+                onClick={() => setReportOpen(true)}
+              >
+                Read wrongly?
+              </button>
+            )}
             {patternOpen && <CustomPatternDialog onClose={() => setPatternOpen(false)} />}
+            {reportOpen && <ReportDialog onClose={() => setReportOpen(false)} />}
           </dd>
         </div>
         {tz && <TimeZoneInfo tz={tz} expanded={expanded} />}

@@ -55,6 +55,34 @@ Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml`/`.csv` files (o
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
 
+### Live tail: watch a folder
+
+In Chrome and Edge, **Open folder…** (or dropping a folder on the page) opens the log files in a folder and its
+sub-folders (3 levels; hidden folders and `node_modules` skipped) and keeps watching it, like `tail -f`:
+
+- **What opens**: the most recently changed non-empty log files, up to 50 files and 512 MB (the newest file always
+  opens); the live bar says when older files were left out, and those stay out (only files that appear later are
+  added). The files are copied into memory when opened, because Chrome can't read a file snapshot again once the file
+  has changed: a busy log can't break the parse, or a later re-parse with another format. Rows from different files
+  are merged by time (only the new rows are merged in) and get a **source file** column.
+- **New lines and files**: every second the files are checked for bytes written since the last read, and the folder
+  for new log files. While a file grows, only complete lines are read, each with its line number continuing the
+  file's, and its last entry stays open, so a stack trace written a moment after its line still joins it. Once the
+  file stops growing (a check finds it unchanged), the rest is read (a last line without a newline too) and the entry
+  is closed; so the newest entry shows up one check after it was written. Each file keeps its own parser state (CSV
+  header, IIS `#Fields`). A file that got smaller (truncated or replaced by log rotation) is read again from the
+  start; a deleted file is dropped. `.gz` and `.zip` files open once but aren't watched.
+- **Live bar**: Live/Paused, what is watched, rows added and when; **Follow** keeps the newest row in view (scrolling
+  up stops it, scrolling back to the end resumes it; it needs file order, so it is off while a column is sorted),
+  **Pause** and **Stop** (the rows stay). Filters stay as they are and every view updates with the new rows; changing
+  the format re-reads the files and keeps watching.
+- **Remembered**: the folder's handle is kept in IndexedDB, so the start page offers **Reopen *folder*/** (the browser
+  asks for permission again). In the installed app, files opened with *Open with → Logsift* are watched the same way.
+- **Cost**: each update rebuilds the filter index, so big logs are checked less often (every 4× the last index build
+  time, at least 1 s, at most 30 s): about every 4 s at 500k rows.
+- Reading uses the File System Access API with read permission only; as everywhere in Logsift, nothing is uploaded.
+  Firefox and Safari don't have it, so the button isn't shown there.
+
 ### Several files and archives
 
 Select or drop several files at once — for example a day of hourly IIS logs — and they are parsed as one log:
@@ -174,7 +202,14 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
 - **IP details**: the row details label each client IP's type, worked out offline (Private network, Loopback,
   Link-local, Carrier-grade NAT). Public IPs get a **Look up ↗** link to ipinfo.io (country, owner/ASN), also shown
   as ↗ in the IP filter list and Top client IPs. IPv4, IPv6, `[v6]:port` and `v4:port` are recognised.
-- **Export** the filtered rows in the current sort order to CSV (visible columns) or JSON (all fields + line number).
+- **Export** the filtered rows in the current sort order to CSV (visible columns) or JSON (all fields + line number),
+  or copy them as **Markdown** for an issue, pull request or chat: a summary line (file, rows, errors), the active
+  filters and time range, then the first 50 rows as a table of the visible columns (first line of multi-line values,
+  cells cut at 200 characters, `|`, `` ` ``, `*` and `_` escaped).
+- **Report a log that isn't read correctly**: **Read wrongly?** in the file bar shows the first 15 lines with IP
+  addresses, e-mail addresses, GUIDs, JWTs, bearer tokens, secret query values (`token=`, `key=`, `password=`, …) and
+  long opaque tokens masked, editable, and opens a prefilled GitHub issue with them and the detected format. Nothing
+  is sent from Logsift: the text goes into GitHub's form, where it is reviewed and submitted.
 - **Theme**: follows the system by default; toggle cycles system → light → dark (remembered per browser).
 - **Help**: the header's **Help** button (or `?`) opens a short in-app guide: opening logs, the supported formats,
   filters, views, row details, shortcuts, time zones, installing and privacy. It is part of the app, so it works offline.

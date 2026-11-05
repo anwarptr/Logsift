@@ -538,3 +538,34 @@ describe('custom pattern', () => {
     await waitFor(() => expect(useLogStore.getState().format).toBe('generic'));
   });
 });
+
+describe('sharing', () => {
+  it('copies the filtered rows as Markdown', async () => {
+    await loadSample();
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy());
+    const md = writeText.mock.calls[0]![0];
+    // The sample is mostly 404s from scanners: 13 of its 16 requests are errors.
+    expect(md.split('\n')[0]).toBe('**sample-iis.log** · 16 rows · 13 errors');
+    expect(md).toMatch(/^\| timestamp \|/m);
+  });
+
+  it('opens a report with masked sample lines', async () => {
+    await loadSample();
+    fireEvent.click(screen.getByRole('button', { name: 'Read wrongly?' }));
+    const dialog = screen.getByRole('dialog', { name: /isn't read correctly/ });
+    const lines = (within(dialog).getByLabelText('Sample lines') as HTMLTextAreaElement).value;
+    // The sample's client IPs (10.20.0.x) and ARR log ids (GUIDs) are masked.
+    expect(lines).toContain('DEMO-API-PROD GET /');
+    expect(lines).not.toMatch(/\b10\.20\.\d+\.\d+\b/);
+    expect(lines).toContain('192.0.2.1');
+    expect(lines).toContain('X-ARR-LOG-ID=00000000-0000-0000-0000-000000000000');
+    const link = within(dialog).getByRole('link', { name: /Open GitHub issue/ }) as HTMLAnchorElement;
+    expect(link.href).toMatch(/^https:\/\/github\.com\/anwar-sobha\/Logsift\/issues\/new\?/);
+    expect(new URL(link.href).searchParams.get('body')).toContain('IIS W3C Extended');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});

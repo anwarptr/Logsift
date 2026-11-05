@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseText, type CellValue } from '../parser';
 import { compilePattern } from '../parser/custom';
 import { useLogStore } from '../store/logStore';
+import { useSampleLines } from '../store/useSampleLines';
 import { formatNumber } from '../utils/format';
 
 const SAMPLE_LINES = 200;
@@ -14,26 +15,6 @@ const EXAMPLES: { label: string; pattern: string }[] = [
   { label: 'Pipe-separated', pattern: '{time} | {level} | {logger} | {message}' },
   { label: 'Request line', pattern: '{time} {ip} {method} {path} {status} {duration}ms' },
 ];
-
-/** The first lines of the open log, in file order, to try a pattern on. */
-function useSampleLines(): string[] {
-  const rows = useLogStore((s) => s.rows);
-  const malformed = useLogStore((s) => s.malformed);
-  return useMemo(() => {
-    const entries: { lineNo: number; raw: string }[] = [];
-    for (const r of rows.slice(0, SAMPLE_LINES)) entries.push(r);
-    for (const m of malformed.slice(0, SAMPLE_LINES)) entries.push(m);
-    entries.sort((a, b) => a.lineNo - b.lineNo);
-    const lines: string[] = [];
-    for (const e of entries) {
-      for (const l of e.raw.split('\n')) {
-        lines.push(l);
-        if (lines.length >= SAMPLE_LINES) return lines;
-      }
-    }
-    return lines;
-  }, [rows, malformed]);
-}
 
 function show(v: CellValue | undefined, isTime: boolean): string {
   if (v === null || v === undefined) return '';
@@ -49,7 +30,7 @@ export function CustomPatternDialog({ onClose }: { onClose: () => void }) {
   const [pattern, setPattern] = useState(saved || EXAMPLES[0]!.pattern);
   const inputRef = useRef<HTMLInputElement>(null);
   const opener = useRef<Element | null>(null);
-  const sample = useSampleLines();
+  const sample = useSampleLines(SAMPLE_LINES);
 
   useEffect(() => {
     opener.current = document.activeElement;

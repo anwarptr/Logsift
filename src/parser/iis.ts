@@ -232,5 +232,9 @@ export function createIisParser(): LineParser {
     finish: drain,
     schema: () => schema.list(),
     timeZone: () => IIS_TIME_ZONE,
+    fileState: () => plan,
+    restoreFileState: (state) => {
+      plan = (state as FieldPlan | null | undefined) ?? null;
+    },
   };
 }
