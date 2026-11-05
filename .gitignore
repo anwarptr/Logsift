@@ -3,3 +3,4 @@ dist
 *.local
 coverage
 .vite
+cli/app

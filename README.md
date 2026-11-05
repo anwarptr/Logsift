@@ -70,6 +70,38 @@ Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml`/`.csv` files (o
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
 
+### Live tail from Azure App Service, kubectl, docker or ssh: the `logsift` launcher
+
+Log streams that are not files (Azure App Service, Kubernetes, Docker, a Linux server over SSH) can't be read by a
+web page, so a small launcher does it. It is **not on npm yet**; run it from a clone of this repository (Node.js 18+):
+
+```sh
+npm ci && npm run build:cli                              # once: builds the app into cli/app
+node cli/bin/logsift.mjs --azure my-api -g my-resource-group   # runs "az webapp log tail" for you
+kubectl logs -f deploy/api | node cli/bin/logsift.mjs          # or pipe in any command
+docker logs -f api 2>&1 | node cli/bin/logsift.mjs
+ssh my-vm "tail -F /var/log/app.log" | node cli/bin/logsift.mjs
+```
+
+Once it is published to npm, `node cli/bin/logsift.mjs` becomes `npx logsift` on any machine.
+
+It opens Logsift in your browser with the stream live: the live bar, Follow, filters and Compare work as for a
+folder. For App Service it needs the [Azure CLI](https://aka.ms/installazurecli) signed in (`az login`) and logging
+turned on for the app (`az webapp log config -n my-api -g my-resource-group --application-logging filesystem
+--web-server-logging filesystem`). Options: `--slot`, `--subscription`, `--name <label>`, `--port <n>`,
+`--no-open`. On Windows PowerShell 5.1 prefer `--azure` to piping `az` into it (PowerShell 5.1 re-encodes text
+between commands).
+
+How it works: the launcher (`cli/`, no dependencies) serves the built app and the stream on `127.0.0.1` only. The
+stream needs a random token that is only in the address it opens, and requests for any other host name are refused,
+so other machines and web sites can't read it. It keeps the newest 256 MB for a page that reloads. The app sees
+`?stream=/stream?token=…` (only on 127.0.0.1/localhost, only that same-origin path) and reads the stream as a file
+that keeps growing, through the same live tail as a folder. When the command ends, the live bar says so and the rows
+stay.
+
+To publish the npm package (not done yet): `npm run build:cli` (builds the app, copies it into `cli/app/` and gives
+the package the app's version), then `cd cli && npm publish` with an npm account.
+
 ### Live tail: watch a folder
 
 In Chrome and Edge, **Open folder…** (or dropping a folder on the page) opens the log files in a folder and its

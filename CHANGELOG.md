@@ -2,6 +2,15 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.6.0 — 2026-11-05
+
+### New
+
+- **The `logsift` launcher** (`cli/` in the repository, not on npm yet): watch Azure App Service logs live with
+  `--azure my-api -g my-group` (it runs `az webapp log tail` for you), or pipe in any command: `kubectl logs -f …`,
+  `docker logs -f …`, `ssh … tail -F …`. It opens Logsift with the stream live, served from your own computer only.
+  See the README for how to run it.
+
 ## 0.5.0 — 2026-11-05
 
 ### New

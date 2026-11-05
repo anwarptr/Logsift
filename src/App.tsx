@@ -17,6 +17,7 @@ import { SearchBox } from './components/SearchBox';
 import { TableToolbar } from './components/TableToolbar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useUrlSync } from './filters/useUrlSync';
+import { useStreamWaiting } from './live/streamStart';
 import { useLogStore } from './store/logStore';
 import { useDisplayIndices, useLogIndex, useSearchHighlight, useVisibleColumns } from './store/useView';
 import { useShortcuts } from './utils/useShortcuts';
@@ -25,6 +26,7 @@ export default function App() {
   const status = useLogStore((s) => s.status);
   const error = useLogStore((s) => s.error);
   const setError = useLogStore((s) => s.setError);
+  const waitingForStream = useStreamWaiting();
   const rows = useLogStore((s) => s.rows);
   const hasData = useLogStore((s) => s.rows.length + s.malformed.length > 0);
   const tab = useLogStore((s) => s.tab);
@@ -76,6 +78,11 @@ export default function App() {
           <button type="button" className="btn small ghost" aria-label="Dismiss error" onClick={() => setError(null)}>
             ✕
           </button>
+        </div>
+      )}
+      {waitingForStream && (
+        <div className="stream-waiting" role="status">
+          Waiting for the first lines of <b>{waitingForStream}</b> from the terminal…
         </div>
       )}
       {status === 'loading' && <ParseProgress />}

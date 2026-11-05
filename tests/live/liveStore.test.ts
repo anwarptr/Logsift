@@ -159,3 +159,27 @@ describe('live demo', () => {
     expect(useLogStore.getState().rows.length).toBe(stopped);
   });
 });
+
+describe('npx logsift stream', () => {
+  it('shows a stream from the launcher live, like a growing file', async () => {
+    const { useLogStore } = await import('../../src/store/logStore');
+    const { openStream } = await import('../../src/live/streamSource');
+    let ctl!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({ start: (c) => void (ctl = c) });
+    const enc = new TextEncoder();
+    const stream = openStream('/stream?token=x', 'my-api (App Service).log', (async () => new Response(body)) as unknown as typeof fetch);
+    ctl.enqueue(enc.encode(line(1, 'INFO', 'started') + line(2, 'INFO', 'a')));
+    await stream.firstData;
+    await useLogStore.getState().openFileHandles([stream.handle]);
+    await vi.waitFor(() => expect(useLogStore.getState().file?.name).toBe('my-api (App Service).log'));
+    await vi.waitFor(() => expect(useLogStore.getState().status).toBe('ready'));
+    expect(useLogStore.getState().live).toMatchObject({ kind: 'files', label: 'my-api (App Service).log' });
+    expect(useLogStore.getState().rows).toHaveLength(2);
+
+    ctl.enqueue(enc.encode(line(3, 'ERROR', 'payment failed')));
+    await vi.advanceTimersByTimeAsync(2200);
+    await vi.waitFor(() => expect(useLogStore.getState().rows).toHaveLength(3));
+    expect(useLogStore.getState().rows[2]!.values).toMatchObject({ level: 'ERROR', message: 'payment failed' });
+    ctl.close();
+  });
+});

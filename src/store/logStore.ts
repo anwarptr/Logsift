@@ -130,6 +130,8 @@ export interface LogState {
   stopLive(): void;
   setLivePaused(paused: boolean): void;
   setLiveFollowing(following: boolean): void;
+  /** A note in the live bar (e.g. why no more lines arrive). */
+  setLiveNotice(notice: string | null): void;
   setFilters(patch: Partial<FilterState>): void;
   replaceFilters(f: FilterState): void;
   clearFilters(): void;
@@ -684,6 +686,10 @@ export const useLogStore = create<LogState>()((set, get) => {
 
     setLiveFollowing(following) {
       set((s) => ({ live: s.live && { ...s.live, following } }));
+    },
+
+    setLiveNotice(notice) {
+      set((s) => ({ live: s.live && { ...s.live, notice } }));
     },
 
     setFormatOverride(format) {

@@ -901,3 +901,11 @@ input[type='checkbox'] {
 .samples-item .muted {
   font-size: 12px;
 }
+
+/* ---------- npx logsift: waiting for the stream ---------- */
+.stream-waiting {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--info-bg);
+  border-bottom: 1px solid var(--border);
+}
