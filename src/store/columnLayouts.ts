@@ -18,6 +18,8 @@ export interface ColumnLayout {
 const KEY = 'logsift:column-layouts';
 /** Layouts kept at most (the custom format has one per pattern). */
 const MAX_LAYOUTS = 30;
+/** Columns one layout remembers at most (this log's, then earlier logs' columns). */
+export const MAX_LAYOUT_COLUMNS = 300;
 
 export function layoutKey(format: LogFormat | null, pattern: string): string | null {
   if (!format) return null;
@@ -48,17 +50,23 @@ function saveAll(all: Record<string, ColumnLayout>): void {
   }
 }
 
-const isLayout = (l: unknown): l is ColumnLayout =>
-  !!l &&
-  typeof l === 'object' &&
-  Array.isArray((l as ColumnLayout).order) &&
-  Array.isArray((l as ColumnLayout).hidden) &&
-  typeof (l as ColumnLayout).widths === 'object';
+const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/** A stored layout, cleaned up (it may have been edited, or written by another version); null if unusable. */
+function readLayout(l: unknown): ColumnLayout | null {
+  if (!l || typeof l !== 'object') return null;
+  const { order, hidden, widths, at } = l as Partial<ColumnLayout>;
+  if (!isStringArray(order) || !isStringArray(hidden)) return null;
+  const clean: Record<string, number> = {};
+  if (widths && typeof widths === 'object' && !Array.isArray(widths)) {
+    for (const [k, w] of Object.entries(widths)) if (typeof w === 'number' && Number.isFinite(w) && w > 0) clean[k] = w;
+  }
+  return { order, hidden, widths: clean, at: typeof at === 'number' ? at : 0 };
+}
 
 export function loadLayout(key: string | null): ColumnLayout | null {
   if (!key) return null;
-  const l = loadAll()[key];
-  return isLayout(l) ? l : null;
+  return readLayout(loadAll()[key]);
 }
 
 /**
@@ -73,9 +81,10 @@ export function saveLayout(
 ): void {
   if (!key) return;
   const all = loadAll();
-  const prev = isLayout(all[key]) ? all[key] : null;
+  const prev = readLayout(all[key]);
   const current = new Set(order);
-  const kept = prev ? prev.order.filter((k) => !current.has(k)) : [];
+  // Columns of earlier logs, most recently placed first, up to a limit (JSON logs of many apps).
+  const kept = prev ? prev.order.filter((k) => !current.has(k)).slice(0, Math.max(0, MAX_LAYOUT_COLUMNS - order.length)) : [];
   const keptSet = new Set(kept);
   const keptWidths: Record<string, number> = {};
   for (const k of kept) if (prev?.widths[k] !== undefined) keptWidths[k] = prev.widths[k]!;
@@ -98,12 +107,29 @@ export function clearLayout(key: string | null): void {
 }
 
 /**
- * Column order with a saved layout applied: columns the layout knows come first, in its order; the
- * others keep their current order after them.
+ * Add new columns to the current order: each one the layout knows goes right after the nearest column
+ * that comes before it in the layout (first if none); the others go at the end. Columns already in
+ * the order are never moved, so the user's choices in this session stay even if the saved layout is
+ * stale (storage full or unavailable).
  */
-export function orderWithLayout(keys: string[], layout: ColumnLayout | null): string[] {
-  if (!layout) return keys;
+export function insertWithLayout(current: string[], added: string[], layout: ColumnLayout | null): string[] {
+  if (!layout) return [...current, ...added];
   const rank = new Map(layout.order.map((k, i) => [k, i]));
-  const known = keys.filter((k) => rank.has(k)).sort((a, b) => rank.get(a)! - rank.get(b)!);
-  return [...known, ...keys.filter((k) => !rank.has(k))];
+  const out = [...current];
+  const known = added.filter((k) => rank.has(k)).sort((a, b) => rank.get(a)! - rank.get(b)!);
+  for (const k of known) {
+    const r = rank.get(k)!;
+    // The column placed before this one in the layout that is already in the order, if any.
+    let at = -1;
+    let best = -1;
+    for (let i = 0; i < out.length; i++) {
+      const ri = rank.get(out[i]!);
+      if (ri !== undefined && ri < r && ri > best) {
+        best = ri;
+        at = i;
+      }
+    }
+    out.splice(at + 1, 0, k);
+  }
+  return [...out, ...added.filter((k) => !rank.has(k))];
 }

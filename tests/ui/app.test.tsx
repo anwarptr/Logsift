@@ -592,7 +592,7 @@ describe('remembered column layout', () => {
       st().moveColumn('sc-status', 0);
       st().setColumnWidth('sc-status', 222);
     });
-    await new Promise((r) => setTimeout(r, 450)); // widths are saved shortly after a resize
+    // No wait: a resize is saved shortly after it ends, or at once when another log is opened.
 
     // Open the same log again: a new file, same format.
     await reloadSample();
@@ -600,6 +600,9 @@ describe('remembered column layout', () => {
     expect(st().columnOrder[1]).toBe(first);
     expect(st().hiddenColumns['cs-method']).toBe(true);
     expect(st().columnWidths['sc-status']).toBe(222);
+    // Only the changed width is saved; the other columns keep following the defaults.
+    const saved = JSON.parse(localStorage.getItem('logsift:column-layouts')!) as Record<string, { widths: object }>;
+    expect(Object.keys(saved.iis!.widths)).toEqual(['sc-status']);
 
     fireEvent.click(screen.getByRole('button', { name: /^Columns \(/ }));
     expect(screen.getByRole('dialog', { name: 'Choose columns' }).textContent).toContain('Remembered for IIS W3C Extended logs');

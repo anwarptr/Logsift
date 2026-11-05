@@ -14,7 +14,7 @@ import {
 } from '../live/watcher';
 import { saveFolder } from '../live/savedFolder';
 import { appendLive, startParse } from '../worker/client';
-import { clearLayout, layoutKey, loadLayout, orderWithLayout, saveLayout } from './columnLayouts';
+import { clearLayout, insertWithLayout, layoutKey, loadLayout, saveLayout } from './columnLayouts';
 import { liveCheckDelayMs } from './perfStats';
 import type { WorkerResponse } from '../worker/protocol';
 import type { LogSource } from '../worker/streamParse';
@@ -280,21 +280,43 @@ export const useLogStore = create<LogState>()((set, get) => {
       if (saved.has(c.key) ? savedHidden.has(c.key) : DEFAULT_HIDDEN.has(c.key)) hidden[c.key] = true;
       widths[c.key] ??= layout?.widths[c.key] ?? defaultColumnWidth(c);
     }
-    const columnOrder = orderWithLayout([...s.columnOrder, ...added.map((c) => c.key)], layout);
+    // Only the new columns are placed: the columns already shown keep the order the user gave them.
+    const columnOrder = insertWithLayout(s.columnOrder, added.map((c) => c.key), layout);
     return { columnOrder, hiddenColumns: hidden, columnWidths: widths };
   }
 
   /** Save the column layout for this kind of log (widths are saved shortly after a resize ends). */
   let widthSaveTimer: ReturnType<typeof setTimeout> | null = null;
-  function persistColumns(delay = 0) {
+  /** A change made before the format was known (early in a load): saved once it is. */
+  let saveWhenFormatKnown = false;
+  function saveColumnsNow() {
     if (widthSaveTimer) clearTimeout(widthSaveTimer);
     widthSaveTimer = null;
-    const save = () => {
-      const s = get();
-      saveLayout(currentLayoutKey(), s.columnOrder, s.hiddenColumns, s.columnWidths);
-    };
-    if (delay > 0) widthSaveTimer = setTimeout(save, delay);
-    else save();
+    const s = get();
+    const key = currentLayoutKey();
+    if (!key) {
+      saveWhenFormatKnown = true;
+      return;
+    }
+    saveWhenFormatKnown = false;
+    // Only widths the user changed: untouched columns follow the app's defaults, even if those change.
+    const byKey = new Map(s.schema.map((c) => [c.key, c]));
+    const widths: Record<string, number> = {};
+    for (const [k, w] of Object.entries(s.columnWidths)) {
+      const col = byKey.get(k);
+      if (!col || w !== defaultColumnWidth(col)) widths[k] = w;
+    }
+    saveLayout(key, s.columnOrder, s.hiddenColumns, widths);
+  }
+  function persistColumns(delay = 0) {
+    if (widthSaveTimer) clearTimeout(widthSaveTimer);
+    widthSaveTimer = delay > 0 ? setTimeout(saveColumnsNow, delay) : null;
+    if (delay <= 0) saveColumnsNow();
+  }
+  /** Before another log replaces this one: save a resize that is still waiting. */
+  function flushColumnSave() {
+    if (widthSaveTimer) saveColumnsNow();
+    saveWhenFormatKnown = false;
   }
 
   // --- live tail ---
@@ -368,6 +390,7 @@ export const useLogStore = create<LogState>()((set, get) => {
   }
 
   function parse(sources: LogSource[], file: FileMeta, override: LogFormat | 'auto', resetFilters: boolean, live?: LiveInit) {
+    flushColumnSave();
     stopWatcher();
     liveInit = live ?? null;
     set({
@@ -416,6 +439,7 @@ export const useLogStore = create<LogState>()((set, get) => {
       switch (msg.type) {
         case 'start':
           set({ format: msg.format, detectedFormat: msg.detected, files: msg.files });
+          if (saveWhenFormatKnown) saveColumnsNow();
           break;
         case 'batch': {
           if (liveBuffer) {
@@ -703,6 +727,7 @@ export const useLogStore = create<LogState>()((set, get) => {
       // Back to the defaults, and forget the layout saved for this kind of log.
       if (widthSaveTimer) clearTimeout(widthSaveTimer);
       widthSaveTimer = null;
+      saveWhenFormatKnown = false;
       clearLayout(currentLayoutKey());
       const schema = get().schema;
       set({ columnOrder: [], hiddenColumns: {}, columnWidths: {} });

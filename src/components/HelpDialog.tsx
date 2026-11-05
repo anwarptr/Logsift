@@ -18,23 +18,24 @@ const Inline = ({ text }: { text: string }) => (
 function ReleaseNotes({ release }: { release: Release }) {
   return (
     <>
-      {release.notes.map((n, i) => (
-        <p key={i}>
-          <Inline text={n} />
-        </p>
-      ))}
-      {release.groups.map((g, gi) => (
-        <div key={gi}>
-          {g.title && <h4>{g.title}</h4>}
-          <ul>
-            {g.items.map((item, i) => (
-              <li key={i}>
-                <Inline text={item} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {release.blocks.map((b, bi) =>
+        b.kind === 'text' ? (
+          <p key={bi}>
+            <Inline text={b.text} />
+          </p>
+        ) : (
+          <div key={bi}>
+            {b.title && <h4>{b.title}</h4>}
+            <ul>
+              {b.items.map((item, i) => (
+                <li key={i}>
+                  <Inline text={item} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      )}
     </>
   );
 }
