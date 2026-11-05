@@ -53,7 +53,11 @@ beforeAll(() => {
   window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as never;
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // Column layouts are remembered per format; keep tests independent.
+  localStorage.removeItem('logsift:column-layouts');
+});
 
 async function loadSample() {
   const { default: App } = await import('../../src/App');
@@ -567,5 +571,66 @@ describe('sharing', () => {
     expect(new URL(link.href).searchParams.get('body')).toContain('IIS W3C Extended');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+/** Load the sample again in the app that is already on screen. */
+async function reloadSample() {
+  const { loadSample: load } = await import('../../src/components/DropZone');
+  act(() => load());
+  await waitFor(() => expect(rowCount()).toBe('16 of 16 rows'));
+}
+
+describe('remembered column layout', () => {
+  it('opens the next log of the same format with the columns as they were left', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const st = () => useLogStore.getState();
+    const first = st().columnOrder[0]!;
+    act(() => {
+      st().setColumnVisible('cs-method', false);
+      st().moveColumn('sc-status', 0);
+      st().setColumnWidth('sc-status', 222);
+    });
+    await new Promise((r) => setTimeout(r, 450)); // widths are saved shortly after a resize
+
+    // Open the same log again: a new file, same format.
+    await reloadSample();
+    expect(st().columnOrder[0]).toBe('sc-status');
+    expect(st().columnOrder[1]).toBe(first);
+    expect(st().hiddenColumns['cs-method']).toBe(true);
+    expect(st().columnWidths['sc-status']).toBe(222);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Columns \(/ }));
+    expect(screen.getByRole('dialog', { name: 'Choose columns' }).textContent).toContain('Remembered for IIS W3C Extended logs');
+
+    // Reset goes back to the defaults and forgets the layout.
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose columns' })).getByRole('button', { name: 'Reset' }));
+    expect(st().columnOrder[0]).toBe(first);
+    await reloadSample();
+    expect(st().hiddenColumns['cs-method']).toBeUndefined();
+  });
+
+  it('does not apply one format\'s layout to another', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const st = () => useLogStore.getState();
+    act(() => st().setColumnVisible('timestamp', false));
+    act(() => st().loadFiles([new File([sampleJsonl], 'app.jsonl')]));
+    await waitFor(() => expect(st().status).toBe('ready'));
+    expect(st().format).toBe('jsonl');
+    expect(st().hiddenColumns.timestamp).toBeUndefined();
+  });
+});
+
+describe("what's new", () => {
+  it('shows the latest release notes and the version in the help', async () => {
+    await loadSample();
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    const dialog = screen.getByRole('dialog', { name: /Help/ });
+    expect(dialog.textContent).toMatch(/What's new in \d+\.\d+\.\d+/);
+    expect(dialog.textContent).toContain('Live tail');
+    expect(within(dialog).getByRole('link', { name: /All changes/ }).getAttribute('href')).toContain('CHANGELOG.md');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close help' }));
   });
 });

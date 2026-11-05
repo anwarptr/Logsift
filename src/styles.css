@@ -742,6 +742,34 @@ input[type='checkbox'] {
   margin: 0;
   padding-left: 18px;
 }
+.help-version {
+  margin: 0 auto 0 10px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.whats-new {
+  padding: 4px 12px 8px;
+  margin-top: 10px;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+}
+.whats-new h3 {
+  margin-top: 8px;
+}
+.whats-new h4 {
+  margin: 8px 0 2px;
+  font-size: 13px;
+}
+.whats-new p {
+  margin: 6px 0 0;
+}
+.whats-new details {
+  margin-top: 6px;
+}
+.whats-new summary {
+  cursor: pointer;
+  font-weight: 600;
+}
 .help-body li + li {
   margin-top: 2px;
 }

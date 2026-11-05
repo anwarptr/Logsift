@@ -1,5 +1,72 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import changelog from '../../CHANGELOG.md?raw';
 import { useLogStore } from '../store/logStore';
+import { inlineParts, parseChangelog, type Release } from '../utils/changelog';
+
+const CHANGELOG_URL = 'https://github.com/anwar-sobha/Logsift/blob/main/CHANGELOG.md';
+const RELEASES = parseChangelog(changelog);
+
+/** A line of the changelog with its **bold**, *italic* and `code` parts. */
+const Inline = ({ text }: { text: string }) => (
+  <>
+    {inlineParts(text).map((p, i) =>
+      p.style === 'bold' ? <b key={i}>{p.text}</b> : p.style === 'code' ? <code key={i}>{p.text}</code> : p.style === 'italic' ? <i key={i}>{p.text}</i> : <span key={i}>{p.text}</span>,
+    )}
+  </>
+);
+
+function ReleaseNotes({ release }: { release: Release }) {
+  return (
+    <>
+      {release.notes.map((n, i) => (
+        <p key={i}>
+          <Inline text={n} />
+        </p>
+      ))}
+      {release.groups.map((g, gi) => (
+        <div key={gi}>
+          {g.title && <h4>{g.title}</h4>}
+          <ul>
+            {g.items.map((item, i) => (
+              <li key={i}>
+                <Inline text={item} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The latest release in full, older ones folded, and a link to the whole changelog. */
+function WhatsNew() {
+  const [latest, ...older] = RELEASES;
+  if (!latest) return null;
+  return (
+    <section className="whats-new">
+      <h3>
+        What&apos;s new in {latest.version}
+        {latest.date && <span className="muted"> · {latest.date}</span>}
+      </h3>
+      <ReleaseNotes release={latest} />
+      {older.slice(0, 3).map((r) => (
+        <details key={r.version}>
+          <summary>
+            {r.version}
+            {r.date && <span className="muted"> · {r.date}</span>}
+          </summary>
+          <ReleaseNotes release={r} />
+        </details>
+      ))}
+      <p>
+        <a href={CHANGELOG_URL} target="_blank" rel="noopener noreferrer">
+          All changes ↗
+        </a>
+      </p>
+    </section>
+  );
+}
 
 const FORMATS: [name: string, text: ReactNode][] = [
   ['IIS W3C logs', <>u_ex*.log files with a <code>#Fields:</code> header (also from Azure App Service).</>],
@@ -65,11 +132,13 @@ export function HelpDialog() {
       >
         <div className="help-head">
           <h2 id="help-title">Help</h2>
+          <span className="muted help-version">Logsift v{__APP_VERSION__}</span>
           <button ref={closeRef} type="button" className="btn small ghost" aria-label="Close help" onClick={close}>
             ✕
           </button>
         </div>
         <div className="help-body">
+          <WhatsNew />
           <section>
             <h3>Open a log</h3>
             <ul>
@@ -112,7 +181,7 @@ export function HelpDialog() {
           <section>
             <h3>Views</h3>
             <ul>
-              <li><b>Rows</b>: the log itself. Click a column header to sort, drag its edge to resize; <b>Columns</b> shows, hides and reorders them.</li>
+              <li><b>Rows</b>: the log itself. Click a column header to sort, drag its edge to resize; <b>Columns</b> shows, hides and reorders them. Your columns are remembered for the next log of the same format (<b>Reset</b> forgets them).</li>
               <li><b>Endpoints</b>: requests grouped by URL, with error rates and response times.</li>
               <li><b>Patterns</b>: similar messages grouped together, so repeated errors stand out.</li>
               <li><b>Charts</b>: response times over time and by range, traffic by hour of day, and a request flow from callers to endpoints to status codes. Click or drag in a chart to filter.</li>

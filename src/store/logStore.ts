@@ -14,6 +14,7 @@ import {
 } from '../live/watcher';
 import { saveFolder } from '../live/savedFolder';
 import { appendLive, startParse } from '../worker/client';
+import { clearLayout, layoutKey, loadLayout, orderWithLayout, saveLayout } from './columnLayouts';
 import { liveCheckDelayMs } from './perfStats';
 import type { WorkerResponse } from '../worker/protocol';
 import type { LogSource } from '../worker/streamParse';
@@ -258,19 +259,42 @@ const prefs = loadPrefs();
 const initialFilters = typeof location === 'undefined' ? EMPTY_FILTERS : parseFilters(location.hash);
 
 export const useLogStore = create<LogState>()((set, get) => {
-  /** Merge a (possibly grown) schema into the column order without disturbing user choices. */
+  /** Where this kind of log's column layout is remembered. */
+  const currentLayoutKey = () => layoutKey(get().format, get().customPattern);
+
+  /**
+   * Merge a (possibly grown) schema into the column order without disturbing user choices. New
+   * columns take their place, width and visibility from the layout saved for this kind of log.
+   */
   function syncColumns(schema: ColumnDef[]) {
     const s = get();
     const known = new Set(s.columnOrder);
     const added = schema.filter((c) => !known.has(c.key));
     if (added.length === 0) return {};
+    const layout = loadLayout(currentLayoutKey());
+    const saved = new Set(layout?.order);
+    const savedHidden = new Set(layout?.hidden);
     const hidden = { ...s.hiddenColumns };
     const widths = { ...s.columnWidths };
     for (const c of added) {
-      if (DEFAULT_HIDDEN.has(c.key)) hidden[c.key] = true;
-      widths[c.key] ??= defaultColumnWidth(c);
+      if (saved.has(c.key) ? savedHidden.has(c.key) : DEFAULT_HIDDEN.has(c.key)) hidden[c.key] = true;
+      widths[c.key] ??= layout?.widths[c.key] ?? defaultColumnWidth(c);
     }
-    return { columnOrder: [...s.columnOrder, ...added.map((c) => c.key)], hiddenColumns: hidden, columnWidths: widths };
+    const columnOrder = orderWithLayout([...s.columnOrder, ...added.map((c) => c.key)], layout);
+    return { columnOrder, hiddenColumns: hidden, columnWidths: widths };
+  }
+
+  /** Save the column layout for this kind of log (widths are saved shortly after a resize ends). */
+  let widthSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  function persistColumns(delay = 0) {
+    if (widthSaveTimer) clearTimeout(widthSaveTimer);
+    widthSaveTimer = null;
+    const save = () => {
+      const s = get();
+      saveLayout(currentLayoutKey(), s.columnOrder, s.hiddenColumns, s.columnWidths);
+    };
+    if (delay > 0) widthSaveTimer = setTimeout(save, delay);
+    else save();
   }
 
   // --- live tail ---
@@ -657,6 +681,7 @@ export const useLogStore = create<LogState>()((set, get) => {
         else hidden[key] = true;
         return { hiddenColumns: hidden };
       });
+      persistColumns();
     },
 
     moveColumn(key, toIndex) {
@@ -666,13 +691,19 @@ export const useLogStore = create<LogState>()((set, get) => {
         order.splice(i, 0, key);
         return { columnOrder: order };
       });
+      persistColumns();
     },
 
     setColumnWidth(key, width) {
       set((s) => ({ columnWidths: { ...s.columnWidths, [key]: Math.max(MIN_COLUMN_WIDTH, Math.round(width)) } }));
+      persistColumns(400);
     },
 
     resetColumns() {
+      // Back to the defaults, and forget the layout saved for this kind of log.
+      if (widthSaveTimer) clearTimeout(widthSaveTimer);
+      widthSaveTimer = null;
+      clearLayout(currentLayoutKey());
       const schema = get().schema;
       set({ columnOrder: [], hiddenColumns: {}, columnWidths: {} });
       set(syncColumns(schema));

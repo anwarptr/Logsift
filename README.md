@@ -6,6 +6,7 @@ request traces, Windows Event Log exports, Apache/Nginx, Serilog, Python, Java (
 custom pattern.
 
 **Open it: https://logsift.ayzo.app/** — no install or sign-up. It can also be installed as an app that works offline.
+What changed in each release: [CHANGELOG.md](CHANGELOG.md) (also under *What's new* in the app's Help).
 
 ![Logsift showing an IIS log: filters on the left, insights and the log table on the right](docs/screenshot.png)
 
@@ -170,7 +171,10 @@ requests, and exported CSV/JSON. Filtering is unaffected (it works on absolute i
   instead of stretching to the bottom of the window.
 - **Table**: virtualized (tested to stay smooth at 500k rows), sticky header, click-to-sort (asc → desc → off),
   resizable columns (drag a header edge, double-click resets), column chooser with show/hide and drag-to-reorder
-  (↑/↓ buttons for keyboard users), status colours (2xx green, 3xx blue, 4xx amber, 5xx red), level colours,
+  (↑/↓ buttons for keyboard users), **remembered per log format** (order, widths and hidden columns are saved in the
+  browser when you change them and applied to the next log of the same format; the custom format remembers one layout
+  per pattern; a layout only touches columns with the same names, and **Reset** in the column chooser goes back to the
+  defaults and forgets it), status colours (2xx green, 3xx blue, 4xx amber, 5xx red), level colours,
   slow-row highlight (threshold editable, default 1000 ms), compact/comfortable density, search-match highlighting.
   Click a row (or arrow keys + Enter) to open the detail panel with all fields, **Copy as JSON** and **Copy raw line**.
   Fields that have a filter get an **Only this** link (show only rows with that value: any facet column, or the
@@ -321,7 +325,7 @@ once per distinct URI while building the index). Numbers vary by machine; the te
   `pasted-text-filtered.csv/json`. Ctrl+V outside a text field loads the clipboard immediately (a copied file is
   opened as a file); the **Paste text…** dialog lets you review or edit the text first (Ctrl+Enter parses).
   Pasting replaces the current data, like opening a new file.
-- **Preferences** (theme, density, slow threshold, insights open, filter panel open, file bar details, custom pattern) live in `localStorage`; failures are ignored.
+- **Preferences** (theme, density, slow threshold, insights open, filter panel open, file bar details, custom pattern, column layouts per format) live in `localStorage`; failures are ignored.
 
 ## Known limitations
 
@@ -341,7 +345,6 @@ once per distinct URI while building the index). Numbers vary by machine; the te
 - Apache detection expects the standard combined/common layout; custom `LogFormat`s fall back to generic text.
 - Sorting runs on the main thread (≈ 0.3 s for a string column at 500k rows in the benchmark).
 - The numeric range sliders are linear, which is coarse for heavy-tailed byte counts (use the number inputs).
-- Column order, widths and visibility are per session (reset when a new file is loaded).
 - Clipboard copy needs a secure context (https or localhost); a `document.execCommand` fallback is used otherwise.
 
 ## License

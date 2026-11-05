@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FORMAT_LABELS } from '../parser';
 import { useLogStore } from '../store/logStore';
 
 /** Popover listing every column: toggle visibility, drag (or use ↑/↓ buttons) to reorder. */
@@ -9,6 +10,8 @@ export function ColumnChooser() {
   const setVisible = useLogStore((s) => s.setColumnVisible);
   const moveColumn = useLogStore((s) => s.moveColumn);
   const resetColumns = useLogStore((s) => s.resetColumns);
+  const format = useLogStore((s) => s.format);
+  const kind = format ? (format === 'custom' ? 'logs read with this custom pattern' : `${FORMAT_LABELS[format]} logs`) : 'this kind of log';
   const [open, setOpen] = useState(false);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -45,11 +48,18 @@ export function ColumnChooser() {
         <div className="popover column-chooser" role="dialog" aria-label="Choose columns">
           <div className="popover-head">
             <strong>Columns</strong>
-            <button type="button" className="btn small ghost" onClick={resetColumns}>
+            <button
+              type="button"
+              className="btn small ghost"
+              title={`Back to the default columns, and forget the layout saved for ${kind}`}
+              onClick={resetColumns}
+            >
               Reset
             </button>
           </div>
-          <p className="muted small-text">Drag to reorder. Drag a header edge in the table to resize.</p>
+          <p className="muted small-text">
+            Drag to reorder. Drag a header edge in the table to resize. Remembered for {kind}.
+          </p>
           <ul className="col-list">
             {order.map((key, i) => {
               const col = byKey.get(key);
