@@ -186,7 +186,7 @@ stay per file, and the row details and Malformed tab show the file name.
 
 `.github/workflows/ci.yml` runs on every push and pull request: `npm ci`, type check, tests and production build
 (Node 24). On `main`, a green build is then deployed to GitHub Pages, served at
-**https://logsift.ayzo.app/** (custom domain; `anwar-sobha.github.io/Logsift/` redirects there). The site is static: files you open are still parsed only in your
+**https://logsift.ayzo.app/** (custom domain; `anwarptr.github.io/Logsift/` redirects there). The site is static: files you open are still parsed only in your
 browser. One-time setup: in the repository's **Settings → Pages → Build and deployment**, set **Source** to
 **GitHub Actions** (until then the deploy job fails while the checks still run). The perf benchmark is not part
 of CI (timings on shared runners are too noisy to gate on).

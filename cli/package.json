@@ -7,10 +7,10 @@
   "homepage": "https://logsift.ayzo.app/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anwar-sobha/Logsift.git",
+    "url": "git+https://github.com/anwarptr/Logsift.git",
     "directory": "cli"
   },
-  "bugs": "https://github.com/anwar-sobha/Logsift/issues",
+  "bugs": "https://github.com/anwarptr/Logsift/issues",
   "keywords": [
     "logs",
     "log viewer",

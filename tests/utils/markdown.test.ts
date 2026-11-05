@@ -38,7 +38,7 @@ describe('toMarkdown', () => {
 describe('issueUrl', () => {
   it('builds a GitHub new-issue link and cuts long bodies', () => {
     const url = new URL(issueUrl('Title', 'x'.repeat(10_000)));
-    expect(url.origin + url.pathname).toBe('https://github.com/anwar-sobha/Logsift/issues/new');
+    expect(url.origin + url.pathname).toBe('https://github.com/anwarptr/Logsift/issues/new');
     expect(url.searchParams.get('title')).toBe('Title');
     expect(url.toString().length).toBeLessThanOrEqual(MAX_URL_LENGTH);
     expect(url.searchParams.get('body')).toMatch(/…\(cut\)\n```\n$/);

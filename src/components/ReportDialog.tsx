@@ -4,7 +4,7 @@ import { useLogStore } from '../store/logStore';
 import { useSampleLines } from '../store/useSampleLines';
 import { redactLines } from '../utils/redact';
 
-export const ISSUES_URL = 'https://github.com/anwar-sobha/Logsift/issues/new';
+export const ISSUES_URL = 'https://github.com/anwarptr/Logsift/issues/new';
 const SAMPLE_LINES = 15;
 /** GitHub rejects very long URLs (and percent-encoding makes log text up to 3× longer): cut the body to fit. */
 export const MAX_URL_LENGTH = 7000;

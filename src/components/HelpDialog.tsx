@@ -3,7 +3,7 @@ import changelog from '../../CHANGELOG.md?raw';
 import { useLogStore } from '../store/logStore';
 import { inlineParts, parseChangelog, type Release } from '../utils/changelog';
 
-const CHANGELOG_URL = 'https://github.com/anwar-sobha/Logsift/blob/main/CHANGELOG.md';
+const CHANGELOG_URL = 'https://github.com/anwarptr/Logsift/blob/main/CHANGELOG.md';
 const RELEASES = parseChangelog(changelog);
 
 /** A line of the changelog with its **bold**, *italic* and `code` parts. */

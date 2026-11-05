@@ -567,7 +567,7 @@ describe('sharing', () => {
     expect(lines).toContain('192.0.2.1');
     expect(lines).toContain('X-ARR-LOG-ID=00000000-0000-0000-0000-000000000000');
     const link = within(dialog).getByRole('link', { name: /Open GitHub issue/ }) as HTMLAnchorElement;
-    expect(link.href).toMatch(/^https:\/\/github\.com\/anwar-sobha\/Logsift\/issues\/new\?/);
+    expect(link.href).toMatch(/^https:\/\/github\.com\/anwarptr\/Logsift\/issues\/new\?/);
     expect(new URL(link.href).searchParams.get('body')).toContain('IIS W3C Extended');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();

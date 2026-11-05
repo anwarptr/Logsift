@@ -49,4 +49,4 @@ new ones as they arrive (the newest 256 MB are kept for a page that reloads). Th
 is only in the address opened in your browser, and requests for any other host name are refused, so other
 machines and web sites can't read it. The app reads the stream with the same live tail it uses for folders.
 
-MIT license. Source: <https://github.com/anwar-sobha/Logsift>.
+MIT license. Source: <https://github.com/anwarptr/Logsift>.

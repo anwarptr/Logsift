@@ -1,7 +1,7 @@
 import { openIncidentDemo, startLiveDemo } from '../samples';
 import { DropZone } from './DropZone';
 
-const REPO_URL = 'https://github.com/anwar-sobha/Logsift';
+const REPO_URL = 'https://github.com/anwarptr/Logsift';
 
 const FORMATS = ['IIS logs & failed request traces', 'Apache / Nginx', 'Serilog', 'Python', 'Java (logback, log4j, Spring Boot)', 'JSON (pino, Docker, …)', 'logfmt', 'Windows Event Log', 'Syslog', 'CSV / TSV', 'Plain text', 'Your own pattern', '.gz / .zip'];
 
