@@ -13,8 +13,8 @@ export type WorkerRequest =
       /** Rows get a source file column even for one file. */
       multi?: boolean;
     }
-  /** New bytes of a file of the live job (from its last read offset), or a new file; `final` once it stopped growing. */
-  | { type: 'append'; jobId: number; name: string; blob: Blob; modified: number; final?: boolean }
+  /** New bytes of a file of the live job (from its last read offset), or a new file; `final` once it stopped growing (`'lines'`: keep an unfinished last line). */
+  | { type: 'append'; jobId: number; name: string; blob: Blob; modified: number; final?: boolean | 'lines' }
   | { type: 'cancel'; jobId: number };
 
 export type WorkerResponse =

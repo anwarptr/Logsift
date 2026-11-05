@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { chooseRecent, listFolder, LiveWatcher, MAX_DEPTH, type WatchTarget } from '../../src/live/watcher';
+import { describe, expect, it, vi } from 'vitest';
+import { chooseRecent, listFolder, LiveWatcher, MAX_DEPTH, PARTIAL_LINE_QUIET_MS, type WatchTarget } from '../../src/live/watcher';
 import { isAcceptedFile } from '../../src/store/logStore';
 import { FakeDir, FakeFile } from './fakeFs';
 
@@ -7,6 +7,8 @@ import { FakeDir, FakeFile } from './fakeFs';
 function setup(dir: FakeDir | null, targets: WatchTarget[], ignore?: Set<string>) {
   const sent: [string, string][] = [];
   const finals: [string, string][] = [];
+  /** Final reads that close the entry but leave an unfinished last line. */
+  const closes: [string, string][] = [];
   const checks: boolean[] = [];
   const w = new LiveWatcher({
     dir,
@@ -16,18 +18,22 @@ function setup(dir: FakeDir | null, targets: WatchTarget[], ignore?: Set<string>
     delayMs: () => 1_000_000,
     send: async (path, blob, _modified, final) => {
       const text = await blob.text();
-      if (final) {
+      if (final === true) {
         finals.push([path, text]);
         return new TextEncoder().encode(text).length;
       }
       const nl = text.lastIndexOf('\n');
+      if (final === 'lines') {
+        closes.push([path, text.slice(0, nl + 1)]);
+        return new TextEncoder().encode(text.slice(0, nl + 1)).length;
+      }
       if (nl < 0) return 0;
       sent.push([path, text.slice(0, nl + 1)]);
       return new TextEncoder().encode(text.slice(0, nl + 1)).length;
     },
     onCheck: (changed) => checks.push(changed),
   });
-  return { w, sent, finals, checks };
+  return { w, sent, finals, closes, checks };
 }
 
 describe('listFolder', () => {
@@ -66,18 +72,48 @@ describe('chooseRecent', () => {
 describe('LiveWatcher', () => {
   it('reads the rest of a file once it stops growing (an unfinished last line, an open entry)', async () => {
     const f = new FakeFile('app.log', 'one\ntw');
-    const { w, sent, finals } = setup(null, [{ path: 'app.log', handle: f, offset: 4, lastSize: 6 }]);
+    const { w, sent, finals, closes } = setup(null, [{ path: 'app.log', handle: f, offset: 4, lastSize: 6 }]);
     w.start();
-    await w.check(); // unchanged since it was opened: the held "tw" is read as the last line
+    await w.check(); // unchanged since it was opened (long ago): the held "tw" is read as the last line
     expect(finals).toEqual([['app.log', 'tw']]);
     f.append('o more\nthree\n');
     await w.check(); // growing: whole lines only, the entry stays open
     expect(sent).toEqual([['app.log', 'o more\nthree\n']]);
     await w.check(); // stopped growing: close it (nothing left to read)
-    expect(finals).toEqual([['app.log', 'tw'], ['app.log', '']]);
+    expect(closes).toEqual([['app.log', '']]);
     await w.check(); // nothing open any more
-    expect(finals).toHaveLength(2);
+    expect(closes).toHaveLength(1);
+    expect(finals).toHaveLength(1);
     w.stop();
+  });
+
+  it('waits for an unfinished line an editor saved halfway, until the file has been quiet for 10 s', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const f = new FakeFile('app.log', 'one\n');
+      const { w, sent, finals, closes } = setup(null, [{ path: 'app.log', handle: f, offset: 4, lastSize: 4 }]);
+      w.start();
+      f.append('2026-11-05 10:57:59 INF HTTP GET /api/x resp'); // auto-saved mid-typing
+      await w.check();
+      vi.advanceTimersByTime(2000);
+      await w.check(); // quiet for 2 s: the half line is not read yet
+      expect(sent).toEqual([]);
+      expect(closes).toEqual([['app.log', '']]);
+      f.append('onded 500 in 23 ms\n'); // the rest of the line
+      vi.advanceTimersByTime(1000);
+      await w.check();
+      expect(sent).toEqual([['app.log', '2026-11-05 10:57:59 INF HTTP GET /api/x responded 500 in 23 ms\n']]);
+      expect(finals).toEqual([]);
+
+      f.append('no newline at the end');
+      await w.check();
+      vi.advanceTimersByTime(PARTIAL_LINE_QUIET_MS + 1000);
+      await w.check(); // quiet long enough: read as the last line
+      expect(finals).toEqual([['app.log', 'no newline at the end']]);
+      w.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves out the files that were left out when the folder was opened', async () => {

@@ -111,6 +111,45 @@ function looksBinary(text: string): boolean {
   return bad / n > 0.05;
 }
 
+export type TextEncodingName = 'utf-8' | 'utf-16le' | 'utf-16be';
+
+/**
+ * The encoding of log bytes: UTF-8 unless there is a UTF-16 byte order mark, or the bytes look like
+ * UTF-16 without one (every other byte zero, as ASCII text written by Windows PowerShell's `>>` or
+ * `Out-File`, or by .NET's Encoding.Unicode). Null when there are too few bytes to tell.
+ */
+export function sniffEncoding(bytes: Uint8Array): TextEncodingName | null {
+  if (bytes.length >= 2) {
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
+  }
+  const n = Math.min(bytes.length, 1024) & ~1;
+  if (n < 4) return null;
+  let evenZero = 0;
+  let oddZero = 0;
+  for (let i = 0; i < n; i += 2) {
+    if (bytes[i] === 0) evenZero++;
+    if (bytes[i + 1] === 0) oddZero++;
+  }
+  const pairs = n / 2;
+  if (oddZero / pairs > 0.3 && evenZero / pairs < 0.05) return 'utf-16le';
+  if (evenZero / pairs > 0.3 && oddZero / pairs < 0.05) return 'utf-16be';
+  return 'utf-8';
+}
+
+/** Bytes of `s` in `encoding`. */
+const byteLength = (s: string, encoding: TextEncodingName) =>
+  encoding === 'utf-8' ? new TextEncoder().encode(s).length : s.length * 2;
+
+/** End (exclusive) of the last complete line in `bytes`, or 0 when there is none. */
+function lastLineEnd(bytes: Uint8Array, encoding: TextEncodingName): number {
+  if (encoding === 'utf-8') return bytes.lastIndexOf(10) + 1;
+  for (let i = (bytes.length - 2) & ~1; i >= 0; i -= 2) {
+    if (encoding === 'utf-16le' ? bytes[i] === 10 && bytes[i + 1] === 0 : bytes[i] === 0 && bytes[i + 1] === 10) return i + 2;
+  }
+  return 0;
+}
+
 /** `consumed` is how many bytes of the original (possibly compressed) source this chunk accounts for. */
 interface Chunk {
   bytes: Uint8Array;
@@ -227,6 +266,7 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
   const held: Record<string, number> = {};
   const lineNos = new Map<string, number>();
   const fileStates = new Map<string, unknown>();
+  const encodings = new Map<string, TextEncodingName>();
 
   let parser: LineParser | null = null;
   let format: LogFormat = 'generic';
@@ -265,7 +305,9 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     current = input.name;
     // Later files reuse the parser (created on the first lines); tell it this file's date.
     (parser as LineParser | null)?.setDefaultDate?.(input.modified);
-    const decoder = new TextDecoder('utf-8');
+    // Chosen from the file's first bytes (UTF-8, or UTF-16 from Windows tools).
+    let encoding: TextEncodingName = 'utf-8';
+    let decoder: TextDecoder | null = null;
     let carry = '';
     let started = false;
     let lineNo = 0;
@@ -349,6 +391,10 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     for await (const { bytes, consumed } of input.chunks()) {
       if (opts.isCancelled?.()) throw new CancelledError('Cancelled');
       bytesRead += consumed;
+      if (!decoder) {
+        encoding = sniffEncoding(bytes) ?? 'utf-8';
+        decoder = new TextDecoder(encoding);
+      }
       const text = carry + checkStart(decoder.decode(bytes, { stream: true }));
       carry = '';
       if (documentMode === null) documentMode = isJsonDocument(text, false);
@@ -372,7 +418,7 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
       }
       progress(false);
     }
-    const rest = carry + checkStart(decoder.decode());
+    const rest = carry + checkStart(decoder?.decode() ?? '');
     if (documentMode === null) documentMode = isJsonDocument(rest, true);
     if (documentMode) {
       addDocText(rest);
@@ -380,11 +426,14 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     } else if (started) {
       // Live: an unfinished last line is still being written; it is read with the next append.
       // (Nothing after the final newline is not a line, so it isn't counted either.)
-      if (opts.live && input.plain && rest !== '' && parser) held[input.name] = utf8Length(rest);
+      if (opts.live && input.plain && rest !== '' && parser) held[input.name] = byteLength(rest, encoding);
       else if (rest !== '' || !parser) feed(rest);
     }
     // Before finish(), which resets it for the next file.
-    if (opts.live) fileStates.set(input.name, (parser as LineParser | null)?.fileState?.());
+    if (opts.live) {
+      fileStates.set(input.name, (parser as LineParser | null)?.fileState?.());
+      encodings.set(input.name, encoding);
+    }
     emit(true);
     progress(true);
     lineNos.set(input.name, lineNo);
@@ -404,11 +453,10 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     rows: totalRows,
     malformed: totalMalformed,
     timeZone: p.timeZone(),
-    ...(opts.live ? { held, session: { parser: p, multi, lineNos, fileStates, openFile: null } } : {}),
+    ...(opts.live ? { held, session: { parser: p, multi, lineNos, fileStates, encodings, openFile: null } } : {}),
   };
 }
 
-const utf8Length = (s: string) => new TextEncoder().encode(s).length;
 
 /** The state kept after a live parse, so lines appended to the files later continue the same log. */
 export interface LiveSession {
@@ -419,6 +467,8 @@ export interface LiveSession {
   lineNos: Map<string, number>;
   /** Each file's parser state (CSV header, IIS #Fields), as `LineParser.fileState` gave it. */
   fileStates: Map<string, unknown>;
+  /** Each file's text encoding, as detected when it was first read. */
+  encodings: Map<string, TextEncodingName>;
   /** The file whose last entry is still open (more lines of it may follow), or null. */
   openFile: string | null;
 }
@@ -428,8 +478,9 @@ export interface LiveSession {
  * returns how many bytes were consumed (up to and including the last newline); the rest is read again
  * with the next append. The file's last entry stays open, so a stack trace written a moment after its
  * line still joins it; it is closed when another file is read or with `final`, which the watcher sends
- * once the file stops growing: it reads every byte (an unfinished last line included) and closes the
- * entry. `modified` dates time-only lines in a file seen for the first time.
+ * once the file stops growing: `'lines'` closes the entry and leaves an unfinished last line for later
+ * (an editor may be in the middle of it), `true` (once the file has been quiet for a while) reads
+ * every byte, that line included. `modified` dates time-only lines in a file seen for the first time.
  */
 export function appendToSession(
   session: LiveSession,
@@ -437,7 +488,7 @@ export function appendToSession(
   bytes: Uint8Array,
   modified: number,
   onBatch: (batch: StreamBatch) => void,
-  final = false,
+  final: boolean | 'lines' = false,
 ): { consumed: number; timeZone: LogTimeZone } {
   const { parser } = session;
   const schema = () => (session.multi ? [...parser.schema(), SOURCE_COLUMN] : parser.schema());
@@ -455,7 +506,11 @@ export function appendToSession(
     session.openFile = null;
   };
 
-  const end = final ? bytes.length : bytes.lastIndexOf(10) + 1;
+  // Usually the file's encoding; text appended in another one (UTF-16 from PowerShell's `>>` to a
+  // UTF-8 log) is recognised by its own bytes.
+  const encoding = sniffEncoding(bytes) ?? session.encodings.get(name) ?? 'utf-8';
+  if (!session.encodings.has(name)) session.encodings.set(name, encoding);
+  const end = final === true ? bytes.length : lastLineEnd(bytes, encoding);
   if (end === 0 && !final) return { consumed: 0, timeZone: parser.timeZone() };
   if (session.openFile !== null && session.openFile !== name) close(session.openFile);
   let lineNo = session.lineNos.get(name);
@@ -465,9 +520,9 @@ export function appendToSession(
   }
   lineNo ??= 0;
   if (end > 0) {
-    let text = new TextDecoder('utf-8').decode(bytes.subarray(0, end));
+    let text = new TextDecoder(encoding).decode(bytes.subarray(0, end));
     if (text.endsWith('\n')) text = text.slice(0, -1);
-    if (lineNo === 0 && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
     for (const raw of text.split('\n')) {
       const l = raw.charCodeAt(raw.length - 1) === 13 ? raw.slice(0, -1) : raw;
       parser.pushLine(l, ++lineNo);

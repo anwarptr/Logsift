@@ -68,8 +68,9 @@ sub-folders (3 levels; hidden folders and `node_modules` skipped) and keeps watc
 - **New lines and files**: every second the files are checked for bytes written since the last read, and the folder
   for new log files. While a file grows, only complete lines are read, each with its line number continuing the
   file's, and its last entry stays open, so a stack trace written a moment after its line still joins it. Once the
-  file stops growing (a check finds it unchanged), the rest is read (a last line without a newline too) and the entry
-  is closed; so the newest entry shows up one check after it was written. Each file keeps its own parser state (CSV
+  file stops growing (a check finds it unchanged), the entry is closed, so the newest entry shows up one check after
+  it was written. A last line without a newline waits until the file has been quiet for 10 s: an editor (with
+  auto-save) or a slow writer may still be in the middle of it, and reading it early would split the line in two. Each file keeps its own parser state (CSV
   header, IIS `#Fields`). A file that got smaller (truncated or replaced by log rotation) is read again from the
   start; a deleted file is dropped. `.gz` and `.zip` files open once but aren't watched.
 - **Live bar**: Live/Paused, what is watched, rows added and when; **Follow** keeps the newest row in view (scrolling

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { appendToSession, streamParseSources, type StreamBatch } from '../../src/worker/streamParse';
+import { appendToSession, sniffEncoding, streamParseSources, type StreamBatch } from '../../src/worker/streamParse';
 
 const enc = (s: string) => new TextEncoder().encode(s);
+/** Text as UTF-16LE bytes without a byte order mark (what Windows PowerShell's `>>` appends). */
+const utf16le = (s: string) => {
+  const out = new Uint8Array(s.length * 2);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    out[i * 2] = c & 0xff;
+    out[i * 2 + 1] = c >> 8;
+  }
+  return out;
+};
 const line = (sec: number, level: string, msg: string) => `2026-10-27 04:42:${String(sec).padStart(2, '0')} ${level} ${msg}\n`;
 
 async function liveParse(files: Record<string, string>, multi?: boolean) {
@@ -93,6 +103,49 @@ describe('live parsing', () => {
     append('u_ex1.log', '2026-10-27 04:42:03 POST /c 500\n', true);
     const last = rows()[rows().length - 1]!;
     expect(last.values).toMatchObject({ 'cs-method': 'POST', 'cs-uri-stem': '/c', 'sc-status': 500 });
+  });
+
+  it('reads a line appended as UTF-16 to a UTF-8 log (PowerShell ">>")', async () => {
+    const serilog = '2026-11-05 10:57:59.762 +04:00 [INF] HTTP GET /api/products/42 responded 500 in 23.2563 ms';
+    const { session, rows, malformed } = await liveParse({ 'app.log': line(1, 'INFO', 'one') });
+    const batches: StreamBatch[] = [];
+    const r = appendToSession(session, 'app.log', utf16le(serilog + '\r\n'), 0, (b) => batches.push(b));
+    appendToSession(session, 'app.log', new Uint8Array(0), 0, (b) => batches.push(b), true);
+    expect(r.consumed).toBe((serilog.length + 2) * 2);
+    expect(batches.flatMap((b) => b.malformed)).toEqual([]);
+    expect(batches.flatMap((b) => b.rows)[0]!.values).toMatchObject({
+      level: 'INFO',
+      RequestMethod: 'GET',
+      RequestPath: '/api/products/42',
+      StatusCode: 500,
+    });
+    expect(rows()).toHaveLength(1);
+    expect(malformed()).toEqual([]);
+  });
+
+  it('opens and follows a UTF-16 log file (with a byte order mark)', async () => {
+    const bom = new Uint8Array([0xff, 0xfe]);
+    const body = utf16le(line(1, 'INFO', 'one') + line(2, 'WARN', 'two').trimEnd());
+    const blob = new Blob([bom, body]);
+    const batches: StreamBatch[] = [];
+    const summary = await streamParseSources([{ name: 'ps.log', blob }], { live: true, onBatch: (b) => batches.push(b) });
+    expect(batches.flatMap((b) => b.rows).map((x) => x.values.message)).toEqual(['one']);
+    // The unfinished second line is held back, counted in UTF-16 bytes.
+    expect(summary.held).toEqual({ 'ps.log': line(2, 'WARN', 'two').trimEnd().length * 2 });
+    const tail = utf16le(line(2, 'WARN', 'two') + line(3, 'ERROR', 'three'));
+    appendToSession(summary.session!, 'ps.log', tail, 0, (b) => batches.push(b), true);
+    expect(batches.flatMap((b) => b.rows).map((x) => [x.values.level, x.values.message])).toEqual([
+      ['INFO', 'one'],
+      ['WARN', 'two'],
+      ['ERROR', 'three'],
+    ]);
+  });
+
+  it('detects the text encoding', () => {
+    expect(sniffEncoding(new TextEncoder().encode('2026-10-27 INFO hello'))).toBe('utf-8');
+    expect(sniffEncoding(utf16le('2026-10-27 INFO hello'))).toBe('utf-16le');
+    expect(sniffEncoding(new Uint8Array([0xfe, 0xff, 0, 65]))).toBe('utf-16be');
+    expect(sniffEncoding(new Uint8Array([65]))).toBeNull();
   });
 
   it('does not hold back lines of compressed files (they are not tailed)', async () => {

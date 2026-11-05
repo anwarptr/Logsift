@@ -30,6 +30,8 @@ export const MAX_DEPTH = 3;
 export const MAX_FOLDER_FILES = 50;
 /** …and at most this many bytes (they are copied into memory to be read safely while written). */
 export const MAX_FOLDER_BYTES = 512 * 1024 * 1024;
+/** A last line without a newline is read once the file has not changed for this long. */
+export const PARTIAL_LINE_QUIET_MS = 10_000;
 /** At most this much new text is read from one file per check. */
 export const MAX_APPEND_BYTES = 8 * 1024 * 1024;
 
@@ -81,6 +83,8 @@ export interface WatchTarget {
   lastSize?: number;
   /** Its last entry may still be open in the parser (closed by a final read once the file stops growing). */
   open?: boolean;
+  /** When the file last grew (unset: since it was opened; its modified time counts). */
+  quietSince?: number;
 }
 
 export interface WatcherOptions {
@@ -91,10 +95,11 @@ export interface WatcherOptions {
   ignore?: ReadonlySet<string>;
   accept(name: string): boolean;
   /**
-   * Parse new bytes of a file; resolves to the bytes consumed (whole lines). `final` once the file
-   * stopped growing: everything is read (an unfinished last line too) and its last entry is closed.
+   * Parse new bytes of a file; resolves to the bytes consumed (whole lines). Once the file stopped
+   * growing, `final` closes its last entry: `'lines'` leaves an unfinished last line for later, `true`
+   * (after `PARTIAL_LINE_QUIET_MS` of quiet) reads it too.
    */
-  send(path: string, blob: Blob, modified: number, final: boolean): Promise<number>;
+  send(path: string, blob: Blob, modified: number, final: boolean | 'lines'): Promise<number>;
   /** After each check; `changed` when any new lines were read. */
   onCheck(changed: boolean): void;
   /** Milliseconds until the next check. */
@@ -182,10 +187,16 @@ export class LiveWatcher {
         if (file.size < t.offset) t.offset = 0; // truncated or replaced (log rotation): read it again
         const grew = file.size !== t.lastSize;
         t.lastSize = file.size;
+        if (grew) t.quietSince = Date.now();
         const left = file.size - t.offset;
-        // Still being written: read whole lines. Stopped growing: read the rest and close the last entry.
-        const final = !grew && left <= MAX_APPEND_BYTES;
+        // Still being written: read whole lines. Stopped growing: close the last entry, and once it has
+        // been quiet for a while also read an unfinished last line (an editor or a slow writer may still
+        // be in the middle of it: reading it early would split the line in two).
+        const quietMs = Date.now() - (t.quietSince ?? file.lastModified);
+        let final: boolean | 'lines' = false;
+        if (!grew && left <= MAX_APPEND_BYTES) final = quietMs >= PARTIAL_LINE_QUIET_MS ? true : 'lines';
         if (left === 0 && !(final && t.open)) continue;
+        if (final === 'lines' && !t.open) continue; // nothing to close; the unfinished line waits
         const end = Math.min(file.size, t.offset + MAX_APPEND_BYTES);
         const blob = await LiveWatcher.read(file, t.offset, end);
         if (!blob) continue;
@@ -193,7 +204,7 @@ export class LiveWatcher {
         if (this.stopped) break;
         // A single "line" longer than the read limit can't be finished: skip past it.
         t.offset += consumed === 0 && end - t.offset >= MAX_APPEND_BYTES ? end - t.offset : consumed;
-        t.open = !final;
+        t.open = final === false;
         if (consumed > 0) changed = true;
       }
     } finally {

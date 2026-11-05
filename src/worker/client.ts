@@ -54,6 +54,6 @@ export function startParse(
 }
 
 /** Send bytes appended to a file of the current live job; the reply is an 'appended' message. */
-export function appendLive(name: string, blob: Blob, modified: number, final = false): void {
+export function appendLive(name: string, blob: Blob, modified: number, final: boolean | 'lines' = false): void {
   getWorker().postMessage({ type: 'append', jobId: currentJob, name, blob, modified, final } satisfies WorkerRequest);
 }
