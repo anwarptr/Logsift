@@ -637,3 +637,40 @@ describe("what's new", () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close help' }));
   });
 });
+
+describe('compare', () => {
+  it('shows what changed between two halves of the log, and opens those rows', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const st = () => useLogStore.getState();
+    const lines: string[] = [];
+    const T0 = Date.UTC(2026, 10, 5, 10, 0, 0);
+    for (let m = 0; m < 20; m++) {
+      const at = new Date(T0 + m * 60_000).toISOString().replace('T', ' ').replace('Z', ' +00:00');
+      lines.push(`${at} [INF] HTTP POST /api/orders responded ${m >= 10 ? 500 : 200} in ${m >= 10 ? 800 : 30}.0 ms`);
+      if (m >= 10) lines.push(`${at} [ERR] Payment gateway timeout for order ${m}`);
+    }
+    act(() => st().loadText(lines.join('\n')));
+    await waitFor(() => expect(st().status).toBe('ready'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Compare' }));
+    const panel = document.getElementById('panel-compare')!;
+    expect(within(panel).getByLabelText('Compare')).toBeTruthy();
+    expect(panel.textContent).toContain('Endpoints that got worse');
+    expect(panel.textContent).toContain('New or growing messages');
+    expect(within(panel).getByRole('button', { name: /Payment gateway timeout/ })).toBeTruthy();
+
+    // Click the endpoint: the later range's rows for it.
+    fireEvent.click(within(panel).getByRole('button', { name: '/api/orders' }));
+    expect(st().tab).toBe('rows');
+    expect(st().filters.endpoint).toBe('/api/orders');
+    expect(st().filters.timeFrom).not.toBeNull();
+    expect(rowCount()).toBe('10 of 30 rows');
+
+    // The comparison itself ignores the time and endpoint filters it set.
+    fireEvent.click(screen.getByRole('tab', { name: 'Compare' }));
+    expect(document.getElementById('panel-compare')!.textContent).toContain('/api/orders');
+    act(() => st().clearFilters());
+    act(() => st().setTab('rows'));
+  });
+});

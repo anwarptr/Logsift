@@ -17,6 +17,7 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
   const hasUri = useLogStore((s) => s.schema.some((c) => c.role === 'uri'));
   const hasMessage = useLogStore((s) => s.schema.some((c) => c.role === 'message'));
   const hasCharts = useLogStore((s) => s.schema.some((c) => c.role === 'timestamp' || c.role === 'duration' || c.role === 'uri'));
+  const hasTime = useLogStore((s) => s.schema.some((c) => c.role === 'timestamp'));
   const focusMode = useLogStore((s) => s.focusMode);
   const setFocusMode = useLogStore((s) => s.setFocusMode);
 
@@ -73,6 +74,20 @@ export function TableToolbar({ children }: { children?: ReactNode }) {
             onClick={() => setTab('charts')}
           >
             Charts
+          </button>
+        )}
+        {hasTime && (
+          <button
+            type="button"
+            role="tab"
+            id="tab-compare"
+            aria-selected={tab === 'compare'}
+            aria-controls="panel-compare"
+            className="tab"
+            title="What changed between two time ranges: endpoints, messages, new values"
+            onClick={() => setTab('compare')}
+          >
+            Compare
           </button>
         )}
         <button

@@ -186,6 +186,7 @@ export function HelpDialog() {
               <li><b>Endpoints</b>: requests grouped by URL, with error rates and response times.</li>
               <li><b>Patterns</b>: similar messages grouped together, so repeated errors stand out.</li>
               <li><b>Charts</b>: response times over time and by range, traffic by hour of day, and a request flow from callers to endpoints to status codes. Click or drag in a chart to filter.</li>
+              <li><b>Compare</b>: what changed between two time ranges (the two halves, the last 15 minutes / hour / day against the one before, or before and after a time you pick): endpoints that got more errors, slower or busier, messages that are new or more frequent, and status codes, IPs and other values seen only later. Counts are per minute; your filters apply, except the time range. Click a line to see those rows.</li>
               <li><b>Malformed</b>: lines that could not be read, with the reason.</li>
             </ul>
           </section>

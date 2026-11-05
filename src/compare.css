@@ -1,0 +1,138 @@
+/* ---------- Compare tab ---------- */
+.compare {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 16px 24px;
+  font-size: 13px;
+}
+.cmp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.cmp-head label {
+  font-weight: 600;
+}
+.cmp-ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin: 8px 0 0;
+}
+.cmp-ranges > div {
+  display: flex;
+  gap: 6px;
+}
+.cmp-ranges dt {
+  font-weight: 600;
+}
+.cmp-ranges dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.cmp-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cmp-card {
+  min-width: 150px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.cmp-card-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.cmp-card .cmp-change {
+  font-size: 16px;
+}
+.cmp-change {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cmp-after {
+  font-weight: 600;
+}
+.cmp-worse {
+  color: var(--err);
+}
+.cmp-better {
+  color: var(--ok);
+}
+.cmp-section {
+  margin-top: 18px;
+}
+.cmp-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 6px;
+}
+.cmp-section h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.cmp-section > p {
+  margin: 0;
+}
+.cmp-table {
+  width: 100%;
+}
+.cmp-pattern {
+  max-width: 70ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.tag.cmp-new {
+  margin-left: 6px;
+  color: var(--err);
+  background: var(--err-bg);
+}
+.cmp-values {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.cmp-values > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+.cmp-values dt {
+  min-width: 120px;
+  font-weight: 600;
+}
+.cmp-values dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chip-button {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chip-button:hover {
+  border-color: var(--accent);
+}
+.chip-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}

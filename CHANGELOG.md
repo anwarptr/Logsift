@@ -2,6 +2,15 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.4.0 — 2026-11-05
+
+### New
+
+- **Compare** tab: what changed between two time ranges (the two halves of the log, the last 15 minutes / hour /
+  day against the one before, or before and after a time you pick). It shows endpoints that got more errors, slower
+  or busier, messages that are new or more frequent, and values such as status codes or IPs seen only in the later
+  range, all per minute. Click a line to see those rows. The "last …" ranges follow live tail.
+
 ## 0.3.0 — 2026-11-05
 
 ### New

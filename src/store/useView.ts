@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { BIT_ENDPOINT, BIT_PATTERN, compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
+import { BIT_ENDPOINT, BIT_PATTERN, BIT_TIME, compileSearch, evaluateFilters, type FilterEval } from '../filters/applyFilters';
+import { compareRanges, compareRows, type Comparison, type TimeRange } from '../utils/compare';
 import { buildLogIndex, type LogIndex } from '../filters/logIndex';
 import type { FilterState } from '../filters/types';
 import type { ColumnDef, LogRow, LogTimeZone } from '../parser';
@@ -172,4 +173,40 @@ export function useChartData() {
   const zone = useDisplayZone();
   if (!index || !ev) return null;
   return getChartData(rows, schema, index, ev.matched, zone);
+}
+
+/** Rows passing every filter except time, endpoint and pattern (the Compare view sets its own time ranges). */
+const getCompareCandidates = memoLast((mask: Uint32Array) => {
+  const keep = ~(BIT_TIME | BIT_ENDPOINT | BIT_PATTERN);
+  let n = 0;
+  for (let i = 0; i < mask.length; i++) if ((mask[i]! & keep) === 0) n++;
+  const out = new Uint32Array(n);
+  for (let i = 0, j = 0; i < mask.length; i++) if ((mask[i]! & keep) === 0) out[j++] = i;
+  return out;
+});
+
+const getComparison = memoLast(
+  (rows: LogRow[], index: LogIndex, candidates: Uint32Array, aFrom: number, aTo: number, bFrom: number, bTo: number) =>
+    compareRows(
+      index,
+      candidates,
+      { a: { from: aFrom, to: aTo }, b: { from: bFrom, to: bTo } },
+      index.messageKey ? getPatternIndex(rows, index.messageKey) : null,
+    ),
+);
+
+/**
+ * The Compare tab's two ranges and what changed between them, over the rows matching the filters
+ * (ignoring the time, endpoint and pattern filters). Null while loading or without a time span.
+ */
+export function useComparison(): { ranges: { a: TimeRange; b: TimeRange }; result: Comparison } | null {
+  const rows = useLogStore((s) => s.rows);
+  const setting = useLogStore((s) => s.compare);
+  const index = useLogIndex();
+  const ev = useFilterEval();
+  if (!index || !ev) return null;
+  const ranges = compareRanges(setting, index.minTs, index.maxTs);
+  if (!ranges) return null;
+  const { a, b } = ranges;
+  return { ranges, result: getComparison(rows, index, getCompareCandidates(ev.mask), a.from, a.to, b.from, b.to) };
 }

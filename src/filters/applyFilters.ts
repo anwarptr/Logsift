@@ -15,6 +15,8 @@ export const BIT_URI = 4;
 /** Above the facet bits (shift 3, at most 24 facets → bits 3..26). */
 export const BIT_ENDPOINT = 1 << 30;
 export const BIT_PATTERN = 1 << 29;
+/** The time range has its own bit, so the Compare view can set its own ranges and ignore it. */
+export const BIT_TIME = 1 << 28;
 const FACET_BIT_SHIFT = 3;
 
 export interface CompiledSearch {
@@ -79,7 +81,7 @@ export function evaluateFilters(
     for (let i = 0; i < n; i++) {
       const t = ts[i]!;
       // NaN (no timestamp) fails both comparisons and is excluded.
-      if (!(t >= from && t <= to)) mask[i]! |= BIT_OTHER;
+      if (!(t >= from && t <= to)) mask[i]! |= BIT_TIME;
     }
   }
 

@@ -16,13 +16,14 @@ import { saveFolder } from '../live/savedFolder';
 import { appendLive, startParse } from '../worker/client';
 import { clearLayout, insertWithLayout, layoutKey, loadLayout, saveLayout } from './columnLayouts';
 import { liveCheckDelayMs } from './perfStats';
+import { DEFAULT_COMPARE, type CompareSetting } from '../utils/compare';
 import type { WorkerResponse } from '../worker/protocol';
 import type { LogSource } from '../worker/streamParse';
 import { loadPrefs, savePrefs, type Density, type ThemePref, type TimeDisplay } from './prefs';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type SortDir = 'asc' | 'desc';
-export type ViewTab = 'rows' | 'endpoints' | 'patterns' | 'charts' | 'malformed';
+export type ViewTab = 'rows' | 'endpoints' | 'patterns' | 'charts' | 'compare' | 'malformed';
 
 export interface FileMeta {
   name: string;
@@ -107,6 +108,8 @@ export interface LogState {
   focusMode: boolean;
   fileInfoExpanded: boolean;
   helpOpen: boolean;
+  /** The two time ranges of the Compare tab. */
+  compare: CompareSetting;
 
   // --- filters ---
   filters: FilterState;
@@ -154,6 +157,7 @@ export interface LogState {
   setFocusMode(on: boolean): void;
   setFileInfoExpanded(expanded: boolean): void;
   setHelpOpen(open: boolean): void;
+  setCompare(c: CompareSetting): void;
 }
 
 export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.csv', '.tsv', '.gz', '.zip'];
@@ -566,6 +570,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     focusMode: false,
     fileInfoExpanded: prefs.fileInfoExpanded,
     helpOpen: false,
+    compare: DEFAULT_COMPARE,
 
     filters: initialFilters,
     keepFiltersOnLoad: hasActiveFilters(initialFilters),
@@ -783,6 +788,10 @@ export const useLogStore = create<LogState>()((set, get) => {
     setFileInfoExpanded(fileInfoExpanded) {
       set({ fileInfoExpanded });
       savePrefs({ fileInfoExpanded });
+    },
+
+    setCompare(compare) {
+      set({ compare });
     },
 
     setHelpOpen(helpOpen) {

@@ -1,4 +1,5 @@
 import { ChartsView } from './components/charts/ChartsView';
+import { CompareView } from './components/CompareView';
 import { DropZone, ParseProgress } from './components/DropZone';
 import { EndpointsTable } from './components/EndpointsTable';
 import { FileInfo } from './components/FileInfo';
@@ -154,6 +155,10 @@ export default function App() {
               ) : tab === 'charts' ? (
                 <div role="tabpanel" id="panel-charts" aria-labelledby="tab-charts" className="tab-panel">
                   <ChartsView />
+                </div>
+              ) : tab === 'compare' ? (
+                <div role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" className="tab-panel">
+                  <CompareView />
                 </div>
               ) : (
                 <div role="tabpanel" id="panel-malformed" aria-labelledby="tab-malformed" className="tab-panel">
