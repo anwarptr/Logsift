@@ -2,6 +2,16 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.7.0 — 2026-11-05
+
+### New
+
+- **Azure App Service logs live, with no install**: **Azure App Service…** on the start page sets up a
+  **Logsift for Kudu** bookmark. Click it on your app's Kudu site, choose a folder (application logs, your app's own
+  Logs folder, IIS logs, or any other), and its newest files open with new lines arriving live. It uses your normal
+  Azure portal sign-in; the logs go from Azure to your browser only. The bookmark reads log files only, never the
+  app's settings or secrets (such as `appsettings.json` or `web.config`).
+
 ## 0.6.0 — 2026-11-05
 
 ### New

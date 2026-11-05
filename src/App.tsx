@@ -18,6 +18,8 @@ import { TableToolbar } from './components/TableToolbar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useUrlSync } from './filters/useUrlSync';
 import { useStreamWaiting } from './live/streamStart';
+import { KuduConnectDialog } from './components/KuduDialogs';
+import { useState } from 'react';
 import { useLogStore } from './store/logStore';
 import { useDisplayIndices, useLogIndex, useSearchHighlight, useVisibleColumns } from './store/useView';
 import { useShortcuts } from './utils/useShortcuts';
@@ -27,6 +29,8 @@ export default function App() {
   const error = useLogStore((s) => s.error);
   const setError = useLogStore((s) => s.setError);
   const waitingForStream = useStreamWaiting();
+  // Opened by the "Logsift for Kudu" bookmarklet: connect to the Kudu tab and choose a folder.
+  const [kuduOpen, setKuduOpen] = useState(() => new URLSearchParams(location.search).get('source') === 'kudu');
   const rows = useLogStore((s) => s.rows);
   const hasData = useLogStore((s) => s.rows.length + s.malformed.length > 0);
   const tab = useLogStore((s) => s.tab);
@@ -184,6 +188,7 @@ export default function App() {
         )
       )}
       {helpOpen && <HelpDialog />}
+      {kuduOpen && <KuduConnectDialog onClose={() => setKuduOpen(false)} />}
     </div>
   );
 }

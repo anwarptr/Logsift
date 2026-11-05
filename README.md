@@ -70,6 +70,42 @@ Open the app, then drop one or more `.log`/`.txt`/`.json`/`.xml`/`.csv` files (o
 use **Choose files…**, paste log text (**Paste text…**, or just press Ctrl+V anywhere outside a text field), or click
 **Load sample data** (loads `fixtures/sample-iis.log`, bundled into the app).
 
+### Live tail from Azure App Service, with no install: the Kudu bookmark
+
+Every App Service has a Kudu site (`https://<app>.scm.azurewebsites.net`, in the portal under **Advanced Tools**),
+which you can open with your normal portal sign-in. On the start page, **Azure App Service…** shows how to set it up:
+
+1. Drag the **Logsift for Kudu** button to the browser's bookmarks bar (or, where bookmarks can't be added, copy its
+   code and paste it into the browser console on the Kudu site).
+2. Open the app's Kudu site and click the bookmark there. Logsift opens in a new tab.
+3. Choose what to watch: **Application logs** (`LogFiles/Application`), **the app's own Logs folder**
+   (`site/wwwroot/Logs`, e.g. Serilog's file sink), **web server (IIS) logs** (`LogFiles/http/RawLogs`), all of
+   `LogFiles`, or another folder. The newest files open (up to 10 files and 64 MB, since they come over the network),
+   then new lines arrive live, like a local folder. Keep the Kudu tab open while you watch.
+
+How it works: the bookmark runs in the Kudu tab, where you are signed in, and opens Logsift. Logsift asks it by
+`postMessage` to list folders and read parts of files; it does that with Kudu's VFS API (`GET /api/vfs/…`, with a
+`Range` header for the new bytes) and answers. Nothing goes anywhere but between the two tabs. The bookmark only
+answers the Logsift tab it opened and only does GET requests, refusing paths with `..`; Logsift only accepts its
+messages from the window that opened it, and only from an `https://….scm.azurewebsites.net` origin. Folder listings
+are cached for 2 s, so a check doesn't list every folder each second. If Kudu ignores `Range`, each read downloads
+the whole file (fine for small logs).
+
+Security:
+
+- **Log files only.** The bookmark itself only reads log file types (`.log .txt .csv .tsv .json .jsonl .ndjson .clef
+  .xml .gz .zip`) under `LogFiles/` or in a folder with "log" in its name, and never files named like settings or
+  secrets (`appsettings*`, `web.config`, `*.config`, `.env`, `secret`, `password`, `connectionstring`,
+  `credential`). Since the rule is in the bookmark, even a compromised Logsift page could not read the app's
+  settings. Logsift applies the same rule (`isKuduLogPath`) and doesn't show other files.
+- **The bookmark trusts the address it was made from**, which is fixed into it. Create it from
+  `https://logsift.ayzo.app`; one made from a local copy (`localhost`) talks to whatever runs there later (the setup
+  dialog warns about this).
+- **The console option** (pasting the code into the browser console on the Kudu site) does the same, but only paste
+  code copied from Logsift's own dialog, never code someone sends you.
+- **Your logs stay in your browser**, but production logs can contain personal data or tokens: check your company's
+  policy on viewing them in a tool like this (or host your own copy of Logsift).
+
 ### Live tail from Azure App Service, kubectl, docker or ssh: the `logsift` launcher
 
 Log streams that are not files (Azure App Service, Kubernetes, Docker, a Linux server over SSH) can't be read by a

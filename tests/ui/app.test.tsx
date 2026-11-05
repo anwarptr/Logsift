@@ -632,7 +632,9 @@ describe("what's new", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Help' }));
     const dialog = screen.getByRole('dialog', { name: /Help/ });
     expect(dialog.textContent).toMatch(/What's new in \d+\.\d+\.\d+/);
-    expect(dialog.textContent).toContain('Live tail');
+    const { readFileSync } = await import('node:fs');
+    const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+    expect(dialog.textContent).toContain(`What's new in ${version}`);
     expect(within(dialog).getByRole('link', { name: /All changes/ }).getAttribute('href')).toContain('CHANGELOG.md');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close help' }));
   });
@@ -696,5 +698,21 @@ describe('samples and demos', () => {
     expect(screen.queryByRole('menu')).toBeNull();
     await waitFor(() => expect(st().file?.name).toBe('sample-python.log'));
     unmount();
+  });
+});
+
+describe('Azure App Service (Kudu)', () => {
+  it('shows how to set up the bookmark, with the bookmark to drag', async () => {
+    const { KuduSetupDialog } = await import('../../src/components/KuduDialogs');
+    let closed = false;
+    render(<KuduSetupDialog onClose={() => (closed = true)} />);
+    const dialog = screen.getByRole('dialog', { name: 'Azure App Service logs, live' });
+    const link = dialog.querySelector('a.kudu-bookmarklet')!;
+    expect(link.textContent).toBe('Logsift for Kudu');
+    expect(link.getAttribute('href')).toMatch(/^javascript:/);
+    expect(decodeURIComponent(link.getAttribute('href')!)).toContain(location.origin);
+    expect(dialog.textContent).toContain('Advanced Tools');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(closed).toBe(true);
   });
 });

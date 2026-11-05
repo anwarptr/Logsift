@@ -155,7 +155,8 @@ export function HelpDialog() {
               <li><b>Open folder…</b> (Chrome, Edge) opens the log files in a folder and its sub-folders, newest first, and keeps watching it: lines written to the files and new files appear as they arrive. You can also drop a folder on the page.</li>
               <li>The live bar shows what is watched. <b>Follow</b> keeps the newest row in view (scroll up to stop, scroll to the end to resume); <b>Pause</b> and <b>Stop</b> do what they say. Filters, counts and charts update with the new rows.</li>
               <li>The folder is remembered: <b>Reopen</b> on the start page opens it again after the browser asks for permission. Files opened with <i>Open with → Logsift</i> in the installed app are watched too.</li>
-              <li>Azure App Service, kubectl, docker or ssh: the <b>logsift launcher</b> (in the source repository, see its README) runs <code>az webapp log tail</code> or reads any command piped into it, and opens Logsift with the stream live, served from your own computer.</li>
+              <li><b>Azure App Service</b>, with no install: <b>Azure App Service…</b> on the start page sets up a <b>Logsift for Kudu</b> bookmark. Click it on your app's Kudu site (portal → Advanced Tools), choose a folder (application logs, your app's Logs folder, IIS logs…) and watch it live. Keep the Kudu tab open.</li>
+              <li>kubectl, docker or ssh (or App Service with the Azure CLI): the <b>logsift launcher</b> (in the source repository, see its README) runs <code>az webapp log tail</code> or reads any command piped into it, and opens Logsift with the stream live, served from your own computer.</li>
             </ul>
           </section>
 

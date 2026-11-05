@@ -48,6 +48,16 @@ interface LiveInit {
   notice?: string;
 }
 
+/** How a folder is opened: limits on what is read at first, and whether to offer it for Reopen. */
+export interface FolderOpenOptions {
+  /** At most this many (most recently changed) files; default MAX_FOLDER_FILES. */
+  maxFiles?: number;
+  /** At most this many bytes; default MAX_FOLDER_BYTES. */
+  maxBytes?: number;
+  /** Remember it for Reopen on the start page (default true; a remote folder can't be). */
+  remember?: boolean;
+}
+
 /** Live tail status, shown in the live bar. */
 export interface LiveState {
   kind: 'folder' | 'files';
@@ -124,7 +134,7 @@ export interface LogState {
   /** Parse pasted text exactly like a file (same worker pipeline). */
   loadText(text: string): void;
   /** Open the log files in a folder (newest first, within limits) and watch it for new lines and files. */
-  openFolder(dir: LiveDirHandle): Promise<void>;
+  openFolder(dir: LiveDirHandle, opts?: FolderOpenOptions): Promise<void>;
   /** Open files given as handles ("Open with" in the installed app) and watch them for new lines. */
   openFileHandles(handles: LiveFileHandle[]): Promise<void>;
   stopLive(): void;
@@ -500,7 +510,12 @@ export const useLogStore = create<LogState>()((set, get) => {
   }
 
   /** Open files from a folder or from handles, watching them for new lines. */
-  async function openLive(entries: FolderEntry[], init: Omit<LiveInit, 'handles' | 'ignore'>, emptyError: string) {
+  async function openLive(
+    entries: FolderEntry[],
+    init: Omit<LiveInit, 'handles' | 'ignore'>,
+    emptyError: string,
+    limits: { maxFiles?: number; maxBytes?: number } = {},
+  ) {
     let withFiles: { path: string; handle: LiveFileHandle; file: File }[];
     try {
       withFiles = await Promise.all(entries.map(async (e) => ({ ...e, file: await e.handle.getFile() })));
@@ -508,7 +523,7 @@ export const useLogStore = create<LogState>()((set, get) => {
       set({ error: `Could not read the files: ${e instanceof Error ? e.message : String(e)}` });
       return;
     }
-    const { chosen, skipped } = chooseRecent(withFiles);
+    const { chosen, skipped } = chooseRecent(withFiles, limits.maxFiles, limits.maxBytes);
     if (chosen.length === 0) {
       set({ error: emptyError });
       return;
@@ -644,7 +659,7 @@ export const useLogStore = create<LogState>()((set, get) => {
       parse([{ name: PASTED_NAME, blob }], { name: PASTED_NAME, size: blob.size }, get().formatOverride, true);
     },
 
-    async openFolder(dir) {
+    async openFolder(dir, opts = {}) {
       let entries: FolderEntry[];
       try {
         entries = await listFolder(dir, isAcceptedFile);
@@ -652,11 +667,12 @@ export const useLogStore = create<LogState>()((set, get) => {
         set({ error: `Could not read the folder "${dir.name}": ${e instanceof Error ? e.message : String(e)}` });
         return;
       }
-      void saveFolder(dir);
+      if (opts.remember !== false) void saveFolder(dir);
       await openLive(
         entries,
         { kind: 'folder', label: dir.name, dir },
         `The folder "${dir.name}" has no log files (.log, .txt, .json, .xml, .csv, .gz or .zip) with content.`,
+        opts,
       );
     },
 

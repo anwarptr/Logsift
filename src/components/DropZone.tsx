@@ -6,6 +6,7 @@ import { ACCEPTED_EXTENSIONS, useLogStore } from '../store/logStore';
 import { formatBytes, formatNumber } from '../utils/format';
 import { isEditable } from '../utils/useShortcuts';
 import { PasteDialog } from './PasteDialog';
+import { KuduSetupDialog } from './KuduDialogs';
 import { SamplesMenu } from './SamplesMenu';
 
 export function loadSample(): void {
@@ -19,6 +20,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pasting, setPasting] = useState(false);
+  const [kuduSetup, setKuduSetup] = useState(false);
   const openFolder = useLogStore((s) => s.openFolder);
   const setError = useLogStore((s) => s.setError);
   const [savedFolder, setSavedFolder] = useState<LiveDirHandle | null>(null);
@@ -193,7 +195,11 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
           Load sample data
         </button>
         <SamplesMenu />
+        <button type="button" className="btn" aria-haspopup="dialog" title="Watch an Azure App Service's logs live, through its Kudu site" onClick={() => setKuduSetup(true)}>
+          Azure App Service…
+        </button>
       </div>
+      {kuduSetup && <KuduSetupDialog onClose={() => setKuduSetup(false)} />}
       {savedFolder && (
         <p className="dropzone-reopen">
           <button type="button" className="btn small" onClick={() => void reopenFolder(savedFolder)}>
