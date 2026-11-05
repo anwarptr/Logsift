@@ -144,6 +144,7 @@ export function HelpDialog() {
             <h3>Open a log</h3>
             <ul>
               <li>Drop files anywhere on the page, use <b>Open files…</b>, or paste text (<b>Paste text…</b> or Ctrl+V).</li>
+              <li>No log at hand? On the start page, <b>More samples</b> has a demo of an API whose payments start failing (it opens in <b>Compare</b>), a live demo that keeps writing lines, and one small log of each kind.</li>
               <li>Several files open as one log in time order, with a <i>source file</i> column. <code>.gz</code> and <code>.zip</code> files are unpacked for you.</li>
               <li>The format is detected automatically; if it guesses wrong, pick one in the <b>Format</b> menu in the file bar. Still wrong? <b>Read wrongly?</b> next to it reports the log (with IPs, e-mails and tokens masked) so the format can be added.</li>
             </ul>

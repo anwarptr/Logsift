@@ -6,6 +6,7 @@ import { ACCEPTED_EXTENSIONS, useLogStore } from '../store/logStore';
 import { formatBytes, formatNumber } from '../utils/format';
 import { isEditable } from '../utils/useShortcuts';
 import { PasteDialog } from './PasteDialog';
+import { SamplesMenu } from './SamplesMenu';
 
 export function loadSample(): void {
   useLogStore.getState().loadFile(new File([sampleIis], 'sample-iis.log', { type: 'text/plain' }));
@@ -191,6 +192,7 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
         <button type="button" className="btn" onClick={loadSample}>
           Load sample data
         </button>
+        <SamplesMenu />
       </div>
       {savedFolder && (
         <p className="dropzone-reopen">

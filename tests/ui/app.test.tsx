@@ -674,3 +674,27 @@ describe('compare', () => {
     act(() => st().setTab('rows'));
   });
 });
+
+describe('samples and demos', () => {
+  it('opens the incident demo in Compare, and a sample of each kind from the menu', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const st = () => useLogStore.getState();
+    const { openIncidentDemo } = await import('../../src/samples');
+    act(() => openIncidentDemo());
+    await waitFor(() => expect(st().tab).toBe('compare'));
+    expect(st().file?.name).toBe('incident-demo.log');
+    const panel = document.getElementById('panel-compare')!;
+    expect(within(panel).getByRole('button', { name: '/api/payments' })).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: /Payment gateway timeout/ })).toBeTruthy();
+
+    act(() => st().setTab('rows'));
+    const { SamplesMenu } = await import('../../src/components/SamplesMenu');
+    const { unmount } = render(<SamplesMenu />);
+    fireEvent.click(screen.getByRole('button', { name: /More samples/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Python logging' }));
+    expect(screen.queryByRole('menu')).toBeNull();
+    await waitFor(() => expect(st().file?.name).toBe('sample-python.log'));
+    unmount();
+  });
+});

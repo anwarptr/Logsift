@@ -140,3 +140,22 @@ describe('live folder', () => {
     expect(useLogStore.getState().error).toMatch(/has no log files/);
   });
 });
+
+describe('live demo', () => {
+  it('opens the demo log and keeps adding rows until stopped', async () => {
+    const { useLogStore } = await import('../../src/store/logStore');
+    const { startLiveDemo } = await import('../../src/samples');
+    startLiveDemo();
+    await vi.waitFor(() => expect(useLogStore.getState().file?.name).toBe('payments-api.log'));
+    await vi.waitFor(() => expect(useLogStore.getState().status).toBe('ready'));
+    expect(useLogStore.getState().live).toMatchObject({ kind: 'files', label: 'payments-api.log' });
+    const before = useLogStore.getState().rows.length;
+    await vi.advanceTimersByTimeAsync(6000);
+    await vi.waitFor(() => expect(useLogStore.getState().rows.length).toBeGreaterThan(before));
+
+    useLogStore.getState().stopLive();
+    const stopped = useLogStore.getState().rows.length;
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(useLogStore.getState().rows.length).toBe(stopped);
+  });
+});

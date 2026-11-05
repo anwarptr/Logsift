@@ -370,6 +370,15 @@ input[type='checkbox'] {
   line-height: 1.5;
   color: var(--fg-muted);
 }
+.home-feature {
+  display: flex;
+  flex-direction: column;
+}
+.home-feature-action {
+  align-self: flex-start;
+  margin-top: auto;
+  translate: 0 8px;
+}
 .home-tips {
   margin: 0;
   font-size: 12.5px;
@@ -849,4 +858,46 @@ input[type='checkbox'] {
 }
 .report-dialog a.btn {
   text-decoration: none;
+}
+
+/* ---------- Samples menu ---------- */
+.samples-menu {
+  left: 0;
+  right: auto;
+  width: min(340px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  text-align: left;
+}
+.samples-group {
+  margin: 6px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.samples-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.samples-item:hover,
+.samples-item:focus-visible {
+  background: var(--row-hover);
+  outline: none;
+}
+.samples-item .muted {
+  font-size: 12px;
 }

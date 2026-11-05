@@ -10,6 +10,20 @@ What changed in each release: [CHANGELOG.md](CHANGELOG.md) (also under *What's n
 
 ![Logsift showing an IIS log: filters on the left, insights and the log table on the right](docs/screenshot.png)
 
+**What you can do with it**
+
+- **Find what broke**: the **Compare** tab puts two time ranges side by side (before and after a deploy, the last
+  hour against the one before): endpoints with more errors or slower responses, new error messages, new status codes.
+- **Watch logs live**: **Open folder…** shows new lines as your app writes them, like `tail -f` with filters, charts
+  and error counts.
+- **Read your kind of log**: 15+ formats are detected automatically, and **Custom pattern…** reads any other layout.
+- **Dig in and share**: filters and search on a table that stays fast at 500k rows; Endpoints, Patterns and Charts
+  views; copy findings as Markdown for a ticket or a pull request.
+
+**Try it without your own logs**: on the start page, **More samples** opens a demo of an API whose payments start
+failing (it opens in Compare), a live demo that keeps writing lines, and one small log of each supported kind. The
+demo logs are generated in the browser.
+
 Everything runs in your browser: files are parsed in a Web Worker and **no data leaves the machine**
 (there is no backend and no network call besides loading the app itself).
 

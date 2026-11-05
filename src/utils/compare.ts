@@ -178,7 +178,8 @@ export function compareRows(
     for (let c = 0; c < pat.values.length; c++) {
       const ca = epCount[0]![c]!;
       const cb = epCount[1]![c]!;
-      if (ca === 0 && cb === 0) continue;
+      // Rows without a URL (application lines among requests) are not an endpoint.
+      if ((ca === 0 && cb === 0) || pat.values[c] === NULL_KEY) continue;
       endpoints.push({
         pattern: pat.values[c]!,
         a: { count: ca, errors: epErr[0]![c]!, p95: sortedP95(epDur[0]!.get(c) ?? []) },

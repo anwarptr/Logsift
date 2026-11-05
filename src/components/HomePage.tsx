@@ -1,17 +1,24 @@
+import { openIncidentDemo, startLiveDemo } from '../samples';
 import { DropZone } from './DropZone';
 
 const REPO_URL = 'https://github.com/anwar-sobha/Logsift';
 
 const FORMATS = ['IIS logs & failed request traces', 'Apache / Nginx', 'Serilog', 'Python', 'Java (logback, log4j, Spring Boot)', 'JSON (pino, Docker, …)', 'logfmt', 'Windows Event Log', 'Syslog', 'CSV / TSV', 'Plain text', 'Your own pattern', '.gz / .zip'];
 
-const FEATURES = [
+const FEATURES: { title: string; text: string; action?: { label: string; run: () => void } }[] = [
   {
-    title: 'Filter and search',
-    text: 'Status, method, IP and time filters, full-text or regex search, sortable columns, all on a table that stays fast with 500k rows.',
+    title: 'Find what broke',
+    text: 'Compare two time ranges, like before and after a deploy: endpoints with more errors or slower responses, new error messages, new status codes.',
+    action: { label: 'Try it on a demo log', run: openIncidentDemo },
   },
   {
-    title: 'Spot problems',
-    text: 'Error rate, slowest requests, a requests-over-time chart and per-endpoint stats show where things go wrong.',
+    title: 'Watch logs live',
+    text: 'Open a folder and see new lines as your app writes them, like tail -f with filters, charts and error counts (Chrome, Edge).',
+    action: { label: 'See a live demo', run: startLiveDemo },
+  },
+  {
+    title: 'Filter, chart and share',
+    text: 'Filters and search on a table that stays fast at 500k rows; endpoints, message patterns and charts; copy findings as Markdown for a ticket.',
   },
   {
     title: 'Private by design',
@@ -41,6 +48,11 @@ export function HomePage() {
           <div key={f.title} className="home-feature">
             <h3>{f.title}</h3>
             <p>{f.text}</p>
+            {f.action && (
+              <button type="button" className="btn small home-feature-action" onClick={f.action.run}>
+                {f.action.label} <span aria-hidden="true">→</span>
+              </button>
+            )}
           </div>
         ))}
       </section>

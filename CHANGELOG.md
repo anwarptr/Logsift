@@ -2,6 +2,18 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.5.0 — 2026-11-05
+
+### New
+
+- **More samples** on the start page: a demo of an API whose payments start failing (it opens in Compare, showing
+  what broke), a live demo that keeps writing new lines, and one small log of each supported kind.
+- The start page shows what you can do, with one-click demos.
+
+### Fixed
+
+- Compare no longer lists lines without a URL (application messages among requests) as an endpoint.
+
 ## 0.4.0 — 2026-11-05
 
 ### New
