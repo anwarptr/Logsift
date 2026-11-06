@@ -1,7 +1,7 @@
 // @ts-check
 
 /**
- * Command-line options of `npx logsift`. Throws an Error with a message for the user on bad input.
+ * Command-line options of `npx logsifter`. Throws an Error with a message for the user on bad input.
  * @param {string[]} argv
  */
 export function parseArgs(argv) {

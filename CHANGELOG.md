@@ -4,6 +4,11 @@ What changed in each Logsift release, newest first. The in-app Help shows the la
 
 ## 0.7.1 — 2026-11-06
 
+### New
+
+- **The launcher is on npm as `logsifter`**: `npx logsifter --azure my-api -g my-group` watches an App Service live,
+  and `kubectl logs -f … | npx logsifter` shows any command's output, with nothing to install first.
+
 ### Security
 
 - **CSV exports can't run formulas any more**: a log field starting with `=`, `+`, `-` or `@` (a user agent or URL

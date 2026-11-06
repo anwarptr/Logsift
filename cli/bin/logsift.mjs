@@ -15,15 +15,15 @@ const { version } = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'u
 const HELP = `Logsift ${version}: watch a log stream live in your browser. Nothing leaves your computer.
 
 Usage:
-  npx logsift --azure <app> -g <resource-group> [--slot <slot>] [--subscription <id>]
+  npx logsifter --azure <app> -g <resource-group> [--slot <slot>] [--subscription <id>]
       Runs "az webapp log tail" for an Azure App Service app and shows its log live.
       Needs the Azure CLI, signed in (az login).
 
-  <command> | npx logsift [--name <label>]
+  <command> | npx logsifter [--name <label>]
       Shows whatever the command writes, e.g.
-        kubectl logs -f deploy/api | npx logsift
-        docker logs -f api 2>&1 | npx logsift
-        ssh my-vm "tail -F /var/log/app.log" | npx logsift
+        kubectl logs -f deploy/api | npx logsifter
+        docker logs -f api 2>&1 | npx logsifter
+        ssh my-vm "tail -F /var/log/app.log" | npx logsifter
 
 Options:
   --name <label>   Name shown in Logsift (default: the command, or "stdin")

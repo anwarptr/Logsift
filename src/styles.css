@@ -902,7 +902,7 @@ input[type='checkbox'] {
   font-size: 12px;
 }
 
-/* ---------- npx logsift: waiting for the stream ---------- */
+/* ---------- npx logsifter: waiting for the stream ---------- */
 .stream-waiting {
   padding: 8px 16px;
   font-size: 13px;

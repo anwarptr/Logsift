@@ -3,7 +3,7 @@ import { useLogStore } from '../store/logStore';
 import { openStream, streamParams, type LogStream } from './streamSource';
 
 /**
- * Opens the launcher's stream when the page was opened by `npx logsift`, and tells the user while it
+ * Opens the launcher's stream when the page was opened by `npx logsifter`, and tells the user while it
  * waits for the first lines and when the stream ends.
  */
 

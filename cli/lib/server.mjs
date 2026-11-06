@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 
 /**
- * The local server behind `npx logsift`: it serves the Logsift app and streams the log lines
+ * The local server behind `npx logsifter`: it serves the Logsift app and streams the log lines
  * received so far, then new ones as they arrive, to the browser. It listens on 127.0.0.1 only, the
  * stream needs a random token, and requests for any other host name are refused (DNS rebinding), so
  * other machines and other web sites can't read the log.

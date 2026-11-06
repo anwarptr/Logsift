@@ -106,20 +106,20 @@ Security:
 - **Your logs stay in your browser**, but production logs can contain personal data or tokens: check your company's
   policy on viewing them in a tool like this (or host your own copy of Logsift).
 
-### Live tail from Azure App Service, kubectl, docker or ssh: the `logsift` launcher
+### Live tail from Azure App Service, kubectl, docker or ssh: the `logsifter` launcher
 
 Log streams that are not files (Azure App Service, Kubernetes, Docker, a Linux server over SSH) can't be read by a
-web page, so a small launcher does it. It is **not on npm yet**; run it from a clone of this repository (Node.js 18+):
+web page, so a small launcher does it. It is on npm as [`logsifter`](https://www.npmjs.com/package/logsifter)
+(Node.js 18+, nothing to install first):
 
 ```sh
-npm ci && npm run build:cli                              # once: builds the app into cli/app
-node cli/bin/logsift.mjs --azure my-api -g my-resource-group   # runs "az webapp log tail" for you
-kubectl logs -f deploy/api | node cli/bin/logsift.mjs          # or pipe in any command
-docker logs -f api 2>&1 | node cli/bin/logsift.mjs
-ssh my-vm "tail -F /var/log/app.log" | node cli/bin/logsift.mjs
+npx logsifter --azure my-api -g my-resource-group   # runs "az webapp log tail" for you
+kubectl logs -f deploy/api | npx logsifter          # or pipe in any command
+docker logs -f api 2>&1 | npx logsifter
+ssh my-vm "tail -F /var/log/app.log" | npx logsifter
 ```
 
-Once it is published to npm, `node cli/bin/logsift.mjs` becomes `npx logsift` on any machine.
+From a clone of this repository, `npm ci && npm run build:cli` once, then `node cli/bin/logsift.mjs` does the same.
 
 It opens Logsift in your browser with the stream live: the live bar, Follow, filters and Compare work as for a
 folder. For App Service it needs the [Azure CLI](https://aka.ms/installazurecli) signed in (`az login`) and logging

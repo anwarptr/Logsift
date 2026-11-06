@@ -1,7 +1,7 @@
 import type { LiveFileHandle } from './watcher';
 
 /**
- * A log stream from the `npx logsift` launcher: it serves this app on 127.0.0.1 and opens it with
+ * A log stream from the `npx logsifter` launcher: it serves this app on 127.0.0.1 and opens it with
  * `?stream=/stream?token=…&name=…`. The lines received so far are kept in memory behind something that
  * looks like a file handle that keeps growing, so live tail reads the stream like a log file.
  */

@@ -1,5 +1,5 @@
 {
-  "name": "logsift",
+  "name": "logsifter",
   "version": "0.7.1",
   "description": "Watch a log stream live in your browser: Azure App Service (az webapp log tail), kubectl, docker or anything piped in. Nothing leaves your computer.",
   "license": "MIT",
@@ -24,7 +24,7 @@
   ],
   "type": "module",
   "bin": {
-    "logsift": "bin/logsift.mjs"
+    "logsifter": "bin/logsift.mjs"
   },
   "files": [
     "bin",
