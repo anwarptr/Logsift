@@ -45,7 +45,10 @@ jobs:
           fi
       - name: Publish
         working-directory: cli
-        run: npm publish --access public
+        # Verbose: when npm refuses the trusted-publishing sign-in, the reason only shows in its verbose log.
+        run: |
+          npm --version
+          npm publish --access public --loglevel verbose
       - name: Check it is on npm
         working-directory: cli
         run: |
