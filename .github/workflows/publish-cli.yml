@@ -2,7 +2,8 @@ name: Publish logsifter to npm
 
 # Started by hand (Actions → "Publish logsifter to npm" → Run workflow), from a computer or the GitHub
 # mobile app. It checks, tests and builds everything first, then publishes cli/ as "logsifter" with
-# the version in package.json. Needs the repository secret NPM_TOKEN (an npm access token).
+# the version in package.json. No token: npm trusts this workflow file in this repository (Trusted
+# Publisher on npmjs.com), which signs in with GitHub's OIDC token. Renaming this file breaks that.
 
 on:
   workflow_dispatch:
@@ -21,14 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # npm provenance: shows on npmjs.com that this build came from this repository
+      id-token: write # signs in to npm (trusted publishing) and signs the provenance
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@^11.5.1
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -43,9 +45,7 @@ jobs:
           fi
       - name: Publish
         working-directory: cli
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
       - name: Check it is on npm
         working-directory: cli
         run: |
