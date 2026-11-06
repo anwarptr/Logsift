@@ -1,7 +1,7 @@
 {
   "name": "logsift",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -30,6 +30,6 @@
     "jsdom": "^25.0.1",
     "typescript": "5.7",
     "vite": "^6.4.5",
-    "vitest": "^3.2.7"
+    "vitest": "^5.1.0"
   }
 }

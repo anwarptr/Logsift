@@ -1,9 +1,10 @@
 /**
  * The "Logsift for Kudu" bookmarklet: run on an App Service's Kudu site, it opens Logsift and answers
  * its requests to list folders and read files with Kudu's VFS API (GET only), using the user's Kudu
- * sign-in. It only answers the Logsift window it opened, only from Logsift's origin, and refuses paths
- * with "..". It reads log files only (see isKuduLogPath in kudu.ts, the same rule): even a Logsift page
- * that asked for more could not read the app's settings or secrets. The Kudu tab has to stay open while
+ * sign-in. It only answers the Logsift window it opened, only from Logsift's origin, and refuses path
+ * segments made of dots and spaces ("..", ".. "). It lists log folders and reads log files only (see
+ * isKuduLogFolder and isKuduLogPath in kudu.ts, the same rules): even a Logsift page that asked for more
+ * could not list or read the app's other files, settings or secrets. The Kudu tab has to stay open while
  * Logsift watches.
  *
  * `kuduScript(origin)` is the code; `kuduBookmarklet(origin)` the javascript: link to drag to the bookmarks
@@ -19,9 +20,11 @@ var app=h.split(".")[0];
 var w=window.open(L+"/?source=kudu&app="+encodeURIComponent(app),"logsift-kudu");
 if(!w){alert("Logsift: allow pop-ups for this site, then click the bookmark again.");return;}
 window.__logsiftKudu=w;
-var okPath=function(p){return typeof p==="string"&&p.split("/").indexOf("..")<0&&/^[\\w .()\\/-]*$/.test(p);};
-var LOGEXT=/\\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|gz|zip)$/i,SECRET=/(appsettings|web\\.config|\\.config$|^\\.env|secret|password|connectionstring|credential)/i;
-var okRead=function(p){if(!okPath(p))return false;var s=p.split("/").filter(Boolean),f=s.pop()||"";if(!LOGEXT.test(f)||SECRET.test(f))return false;return s[0]==="LogFiles"||s.some(function(x){return /log/i.test(x);});};
+var okPath=function(p){return typeof p==="string"&&/^[\\w .()\\/-]*$/.test(p)&&!p.split("/").some(function(x){return /^[. ]+$/.test(x);});};
+var LOGEXT=/\\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|gz|zip)$/i,SECRET=/(appsettings|settings|web\\.config|\\.config$|^\\.env|secret|password|passwd|connection-?string|credential|private|(^|[-_.])(keys?|tokens?)[-_.])/i;
+var okDir=function(s){return s[0]==="LogFiles"||s.some(function(x){return /^(.*[-_. ])?logs?$/i.test(x);});};
+var okList=function(p){return okPath(p)&&okDir(p.split("/").filter(Boolean));};
+var okRead=function(p){if(!okPath(p))return false;var s=p.split("/").filter(Boolean),f=s.pop()||"";return LOGEXT.test(f)&&!SECRET.test(f)&&okDir(s);};
 var vfs=function(p){return "/api/vfs/"+p.split("/").filter(Boolean).map(encodeURIComponent).join("/");};
 window.addEventListener("message",function(e){
 if(e.source!==w||e.origin!==L)return;
@@ -32,6 +35,7 @@ var reply=function(o,t){o.type="logsift-reply";o.id=m.id;w.postMessage(o,L,t||[]
 var fail=function(x){reply({ok:false,error:String(x&&x.message||x)});};
 if(!okPath(m.path))return fail("bad path");
 if(m.op==="list"){
+if(!okList(m.path))return fail("not a log folder");
 fetch(vfs(m.path)+"/",{credentials:"include"}).then(function(r){if(!r.ok)throw new Error("Kudu answered "+r.status);return r.json();}).then(function(a){
 reply({ok:true,data:a.map(function(x){return {name:x.name,size:x.size,mtime:x.mtime,dir:x.mime==="inode/directory"};})});}).catch(fail);
 }else if(m.op==="read"){

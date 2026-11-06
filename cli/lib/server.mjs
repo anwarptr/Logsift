@@ -1,4 +1,5 @@
 // @ts-check
+import { timingSafeEqual } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
@@ -20,6 +21,19 @@ const TYPES = {
   '.json': 'application/json',
   '.txt': 'text/plain; charset=utf-8',
 };
+
+/**
+ * Compare the token in constant time, so how long a wrong guess takes says nothing about how much of
+ * it was right.
+ * @param {string | null} given
+ * @param {string} token
+ */
+function sameToken(given, token) {
+  if (given === null) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /** Text kept for a browser that connects (or reloads) later; older text is dropped beyond this. */
 export const DEFAULT_MAX_BYTES = 256 * 1024 * 1024;
@@ -53,7 +67,7 @@ export async function createLogServer({ appDir, token, port = 0, maxBytes = DEFA
     const common = { 'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' };
 
     if (url.pathname === '/stream') {
-      if (url.searchParams.get('token') !== token) {
+      if (!sameToken(url.searchParams.get('token'), token)) {
         res.writeHead(403, common).end('Forbidden');
         return;
       }

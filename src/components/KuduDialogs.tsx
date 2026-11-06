@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { cleanKuduPath, KUDU_FOLDERS, KUDU_LIMITS, KuduBridge, KuduDirHandle } from '../live/kudu';
+import { cleanKuduPath, isKuduLogFolder, KUDU_FOLDERS, KUDU_LIMITS, KuduBridge, KuduDirHandle } from '../live/kudu';
 import { kuduBookmarklet, kuduScript } from '../live/kuduBookmarklet';
 import { useLogStore } from '../store/logStore';
 import { copyText } from '../utils/clipboard';
@@ -73,9 +73,9 @@ export function KuduSetupDialog({ onClose }: { onClose: () => void }) {
           </p>
         )}
         <p className="muted small-text">
-          It only lists folders and reads log files (in <code>LogFiles</code> or folders named like <code>Logs</code>),
-          never the app&apos;s settings such as <code>appsettings.json</code> or <code>web.config</code>, and changes
-          nothing.
+          It only lists log folders and reads log files (in <code>LogFiles</code> or folders named like <code>Logs</code>),
+          never the app&apos;s code or settings such as <code>appsettings.json</code> or <code>web.config</code>, and
+          changes nothing. A bookmark made before version 0.7.1 allows more: drag the button again to replace it.
         </p>
         <p className="muted small-text">
           Can&apos;t add bookmarks? On the Kudu site press <kbd>F12</kbd>, open <b>Console</b>, and paste this code instead
@@ -196,6 +196,8 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
                 e.preventDefault();
                 const p = cleanKuduPath(custom);
                 if (p === null) setError('Use a folder path like site/wwwroot/Logs.');
+                else if (!isKuduLogFolder(p))
+                  setError('Logsift only opens log folders: LogFiles, or a folder named Logs (or app-logs, App_Log…) and what is in it.');
                 else void watch(p);
               }}
             >

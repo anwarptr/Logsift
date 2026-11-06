@@ -1,3 +1,4 @@
+import { isRiskyRegex } from './applyFilters';
 import { EMPTY_FILTERS, STATUS_CLASSES, type FilterState, type Range, type StatusClass, type UriMode } from './types';
 
 /** Compact wire format: short keys, defaults omitted. */
@@ -62,7 +63,8 @@ export function parseFilters(hash: string): FilterState {
   }
   if (!isObj(w)) return out;
   if (isStr(w.q)) out.search = w.q;
-  out.regex = w.rx === 1;
+  // A link can carry a regular expression; one that could freeze the tab is searched as plain text.
+  out.regex = w.rx === 1 && !isRiskyRegex(out.search);
   if (typeof w.tf === 'number' && Number.isFinite(w.tf)) out.timeFrom = w.tf;
   if (typeof w.tt === 'number' && Number.isFinite(w.tt)) out.timeTo = w.tt;
   if (isObj(w.f)) {

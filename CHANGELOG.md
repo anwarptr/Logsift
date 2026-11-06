@@ -2,6 +2,22 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.7.1 — 2026-11-06
+
+### Security
+
+- **CSV exports can't run formulas any more**: a log field starting with `=`, `+`, `-` or `@` (a user agent or URL
+  chosen by whoever sent the request) is exported with a leading `'`, so Excel shows it as text instead of running it.
+- **The Logsift for Kudu bookmark is stricter**: it only lists and reads folders named as log folders (`LogFiles`,
+  `Logs`, `app-logs`…), not every folder with "log" somewhere in its name (`blog`, `catalog`), and it refuses more
+  key and settings files (`keys.json`, `local.settings.json`, connection strings). **Drag the bookmark to the
+  bookmarks bar again** to replace one made with 0.7.0.
+- The app now has a Content Security Policy: it runs only its own code and connects nowhere but its own address.
+- A shared link can no longer freeze the tab with a regular expression that takes too long; such a search is
+  done as plain text.
+- **Copy as Markdown** escapes links, images and HTML found in log text.
+- A compressed file that unpacks to more than 2 GB is stopped with a message instead of running the tab out of memory.
+
 ## 0.7.0 — 2026-11-05
 
 ### New

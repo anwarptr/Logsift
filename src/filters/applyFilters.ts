@@ -31,6 +31,44 @@ export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Whether a regular expression has the shape that can take exponential time on a non-matching line
+ * ("catastrophic backtracking"): a repeated group that itself contains a repetition or an alternation,
+ * like (a+)+, (\w*\s?)* or (a|ab)*. A conservative check, not a proof: used to refuse such patterns from
+ * a shared link, where whoever made the link chose them (the search runs over every row on the page's
+ * main thread, so one of these would freeze the tab).
+ */
+export function isRiskyRegex(source: string): boolean {
+  const groups: { quant: boolean; alt: boolean }[] = [];
+  let inClass = false;
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i]!;
+    if (c === '\\') {
+      i++;
+      continue;
+    }
+    if (inClass) {
+      if (c === ']') inClass = false;
+      continue;
+    }
+    const top = groups.at(-1);
+    if (c === '[') inClass = true;
+    else if (c === '(') groups.push({ quant: false, alt: false });
+    else if (c === '|' && top) top.alt = true;
+    else if ((c === '*' || c === '+' || c === '{') && top) top.quant = true;
+    else if (c === ')') {
+      const g = groups.pop();
+      if (!g) continue;
+      // Repeated without bound: *, + or {n,} ({3} or {1,3} can't blow up).
+      const repeated = /^(?:[*+]|\{\d*,\})/.test(source.slice(i + 1, i + 12));
+      if (repeated && (g.quant || g.alt)) return true;
+      const parent = groups.at(-1);
+      if (parent && (g.quant || repeated)) parent.quant = true;
+    }
+  }
+  return false;
+}
+
 export function compileSearch(text: string, regex: boolean): CompiledSearch {
   if (!text) return { test: null, highlight: null, error: null };
   const source = regex ? text : escapeRegExp(text);

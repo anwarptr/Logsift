@@ -172,9 +172,21 @@ async function* sliceChunks(blob: Blob, chunkBytes: number): AsyncGenerator<Chun
   }
 }
 
-async function* decompressChunks(name: string, compressed: Blob, format: CompressionFormat): AsyncGenerator<Chunk> {
+/**
+ * Most text one compressed file may unpack to. A tiny "zip bomb" can unpack to many gigabytes; the tab
+ * would run out of memory long before, so stop with a message instead.
+ */
+export const MAX_UNPACKED_BYTES = 2 * 1024 * 1024 * 1024;
+
+export async function* decompressChunks(
+  name: string,
+  compressed: Blob,
+  format: CompressionFormat,
+  maxUnpacked = MAX_UNPACKED_BYTES,
+): AsyncGenerator<Chunk> {
   let read = 0;
   let reported = 0;
+  let unpacked = 0;
   const counter = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, ctl) {
       read += chunk.byteLength;
@@ -196,6 +208,10 @@ async function* decompressChunks(name: string, compressed: Blob, format: Compres
         throw new ParseError(`Could not decompress "${name}": ${e instanceof Error ? e.message : String(e)}`);
       }
       if (res.done) break;
+      unpacked += res.value.byteLength;
+      if (unpacked > maxUnpacked) {
+        throw new ParseError(`"${name}" unpacks to more than ${Math.round(maxUnpacked / 1024 ** 3)} GB of text, more than Logsift can hold. Unpack it and open part of it.`);
+      }
       yield { bytes: res.value, consumed: read - reported };
       reported = read;
     }

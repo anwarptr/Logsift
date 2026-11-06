@@ -26,6 +26,12 @@ describe('toMarkdown', () => {
     );
   });
 
+  it('escapes links, images and HTML from log text', () => {
+    const evil = parseText('2026-10-27 04:42:03 ERROR ![x](https://evil.example/p.png) [login](https://evil.example) <img src=x>\n');
+    const md = toMarkdown(evil.rows, [0], cols, { fileName: 'f', totalRows: 1, filters: [] });
+    expect(md).toContain('!\\[x\\](https://evil.example/p.png) \\[login\\](https://evil.example) \\<img src=x\\>');
+  });
+
   it(`stops after ${MARKDOWN_MAX_ROWS} rows and says how many were left out`, () => {
     const many = Array.from({ length: 60 }, () => 0);
     const md = toMarkdown(r.rows, many, cols, { fileName: 'f', totalRows: 60, filters: [] });

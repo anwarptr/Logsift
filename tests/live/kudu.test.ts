@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanKuduPath, isKuduLogPath, KUDU_ORIGIN_RE, KuduBridge, KuduDirHandle } from '../../src/live/kudu';
+import { cleanKuduPath, isKuduLogFolder, isKuduLogPath, KUDU_ORIGIN_RE, KuduBridge, KuduDirHandle } from '../../src/live/kudu';
 import { kuduBookmarklet, kuduScript } from '../../src/live/kuduBookmarklet';
 import { listFolder, LiveWatcher } from '../../src/live/watcher';
 
@@ -184,7 +184,48 @@ describe('Kudu bookmarklet reads log files only', () => {
     ['site/wwwroot/logo.png', false],
     ['site/wwwroot/Logs/app.dll', false],
     ['LogFiles/../site/wwwroot/appsettings.json', false],
+    // Found in the security review: folders that only contain "log", key files, dot-and-space segments.
+    ['site/wwwroot/app-logs/2026.log', true],
+    ['site/wwwroot/App_Log/trace.txt', true],
+    ['site/wwwroot/blog/serviceAccount.json', false],
+    ['site/wwwroot/catalog/db-export.csv', false],
+    ['site/wwwroot/node_modules/winston-logger/package.json', false],
+    ['site/wwwroot/Logging/config.json', false],
+    ['site/wwwroot/Logs/keys.json', false],
+    ['site/wwwroot/Logs/api-key.txt', false],
+    ['site/wwwroot/Logs/connection-strings.json', false],
+    ['site/wwwroot/Logs/local.settings.json', false],
+    ['LogFiles/.. /site/wwwroot/local.settings.json', false],
+    ['LogFiles/... /site/wwwroot/firebase.json', false],
+    ['LogFiles/./Application/diag.txt', false],
+    ['site/wwwroot/Logs/monkeys.log', true],
   ];
+
+  const FOLDERS: [path: string, listable: boolean][] = [
+    ['LogFiles', true],
+    ['LogFiles/http/RawLogs', true],
+    ['site/wwwroot/Logs', true],
+    ['site/wwwroot/App_Data/logs/2026', true],
+    ['', false],
+    ['site/wwwroot', false],
+    ['site/wwwroot/blog', false],
+    ['data/Functions/secrets', false],
+    ['LogFiles/.. /site/wwwroot', false],
+  ];
+
+  it.each(FOLDERS)('lists %s → %s', async (path, listable) => {
+    expect(isKuduLogFolder(path)).toBe(listable);
+    const t = twoTabs({ [`${path}/a.log`]: 'x\n' });
+    t.run();
+    const bridge = new KuduBridge(t.opener, t.logsift as unknown as Window);
+    await bridge.connect(2000);
+    const list = bridge.list(path);
+    if (listable) await expect(list).resolves.toBeInstanceOf(Array);
+    else {
+      await expect(list).rejects.toThrow(/not a log folder|bad path/);
+      expect(t.fetched).toEqual([]);
+    }
+  });
 
   it.each(PATHS)('%s → %s', async (path, isLog) => {
     expect(isKuduLogPath(path)).toBe(isLog);

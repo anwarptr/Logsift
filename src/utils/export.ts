@@ -16,10 +16,16 @@ export function rowToJson(row: LogRow, schema: ColumnDef[], zone: DisplayZone = 
   return out;
 }
 
-/** RFC 4180 quoting: wrap in quotes when the value has a comma, quote, CR or LF. */
+/**
+ * RFC 4180 quoting: wrap in quotes when the value has a comma, quote, CR or LF. Text that a spreadsheet
+ * would run as a formula (starting with = + - @, tab or CR) gets a leading ' so it stays text: log fields
+ * such as the user agent or URL come from whoever sent the request ("formula injection"). Numbers (-5,
+ * +1.5) and a lone "-" (an empty field in IIS logs) are not formulas and are left alone.
+ */
 export function csvEscape(v: unknown): string {
   if (v === null || v === undefined) return '';
-  const s = String(v);
+  let s = String(v);
+  if (/^[=+\-@\t\r]/.test(s) && s !== '-' && !/^[+-]?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -72,8 +78,12 @@ function markdownCell(col: ColumnDef, v: unknown, zone: DisplayZone): string {
   return markdownEscape(s);
 }
 
-/** Backslash-escape characters that would break a Markdown table cell or start formatting. */
-const markdownEscape = (s: string) => s.replace(/[\\|`*_]/g, (c) => `\\${c}`);
+/**
+ * Backslash-escape characters that would break a Markdown table cell or start formatting, links,
+ * images or HTML: log text comes from whoever sent the request, and must not turn into a clickable
+ * link or an image in the ticket it is pasted into.
+ */
+const markdownEscape = (s: string) => s.replace(/[\\|`*_[\]<>]/g, (c) => `\\${c}`);
 
 export interface MarkdownSummary {
   fileName: string;
