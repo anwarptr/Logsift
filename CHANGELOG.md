@@ -2,6 +2,12 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.7.2 — 2026-11-06
+
+### Fixed
+
+- The `logsifter` npm package now includes its MIT license file.
+
 ## 0.7.1 — 2026-11-06
 
 ### New

@@ -1,6 +1,6 @@
 {
   "name": "logsifter",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Watch a log stream live in your browser: Azure App Service (az webapp log tail), kubectl, docker or anything piped in. Nothing leaves your computer.",
   "license": "MIT",
   "author": "Anwar",
