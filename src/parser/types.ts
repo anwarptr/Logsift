@@ -2,13 +2,14 @@ import type { LogTimeZone } from './timezone';
 
 export type { LogTimeZone } from './timezone';
 
-export type LogFormat = 'iis' | 'freb' | 'winevent' | 'apache' | 'jsonl' | 'logfmt' | 'syslog' | 'csv' | 'generic' | 'custom';
+export type LogFormat = 'iis' | 'freb' | 'winevent' | 'apache' | 'alb' | 'jsonl' | 'logfmt' | 'syslog' | 'csv' | 'generic' | 'custom';
 
 export const FORMAT_LABELS: Record<LogFormat, string> = {
   iis: 'IIS W3C Extended',
   freb: 'IIS failed request trace',
   winevent: 'Windows Event Log (XML)',
   apache: 'Apache/Nginx combined',
+  alb: 'AWS ALB / ELB access log',
   jsonl: 'JSON lines',
   logfmt: 'logfmt (key=value)',
   syslog: 'Syslog',

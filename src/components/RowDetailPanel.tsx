@@ -5,13 +5,27 @@ import { hasActiveFilters } from '../filters/urlState';
 import { useDisplayZone, useLogIndex } from '../store/useView';
 import { copyText } from '../utils/clipboard';
 import { rowToJson } from '../utils/export';
-import { cellText } from './cells';
+import { cellText, levelClass, statusClass } from './cells';
 import { FrebWaterfall } from './FrebWaterfall';
 import { IpInfo } from './IpInfo';
+
+const TRACE_KEYS = [
+  'trace-id',
+  'traceid',
+  'trace_id',
+  'x-amzn-trace-id',
+  'requestid',
+  'request_id',
+  'correlationid',
+  'correlation_id',
+  'spanid',
+  'span_id',
+];
 
 export function RowDetailPanel() {
   const selectedId = useLogStore((s) => s.selectedId);
   const row = useLogStore((s) => (s.selectedId === null ? undefined : s.rows[s.selectedId]));
+  const rows = useLogStore((s) => s.rows);
   const schema = useLogStore((s) => s.schema);
   const select = useLogStore((s) => s.select);
   // A failed request trace's raw text is its event timeline, not a line from the file.
@@ -30,14 +44,25 @@ export function RowDetailPanel() {
 
   if (!row) return null;
 
-  /** Show only rows with this value, when the column has a filter that can express it. */
-  function onlyThis(key: string, role: string | undefined, v: unknown): (() => void) | null {
-    if (v === null || v === undefined) return null;
-    if (index?.facets.some((c) => c.key === key)) {
-      return () => setFilters({ facets: { ...useLogStore.getState().filters.facets, [key]: [facetKey(v)] } });
+  const traceEntry = Object.entries(row.values).find(
+    ([k, v]) => TRACE_KEYS.includes(k.toLowerCase()) && typeof v === 'string' && v.trim().length > 0,
+  );
+
+  /** Filter or exclude by this field value. Uses facets when available, else search syntax. */
+  function filterByField(key: string, role: string | undefined, v: unknown, exclude = false) {
+    if (v === null || v === undefined) return;
+    if (index?.facets.some((c) => c.key === key) && !exclude) {
+      setFilters({ facets: { ...useLogStore.getState().filters.facets, [key]: [facetKey(v)] } });
+      return;
     }
-    if (role === 'uri' && key === index?.uriKey) return () => setFilters({ uriMode: 'equals', uri: String(v) });
-    return null;
+    if (role === 'uri' && key === index?.uriKey && !exclude) {
+      setFilters({ uriMode: 'equals', uri: String(v) });
+      return;
+    }
+    const strVal = String(v);
+    const token = `${exclude ? '-' : ''}${key}:"${strVal.replace(/"/g, '\\"')}"`;
+    const cur = useLogStore.getState().filters.search.trim();
+    setFilters({ search: cur ? `${cur} ${token}` : token });
   }
 
   async function copy(kind: 'json' | 'raw') {
@@ -46,6 +71,10 @@ export function RowDetailPanel() {
     const ok = await copyText(text);
     setCopied(ok ? (kind === 'json' ? 'Copied JSON' : isTrace ? 'Copied timeline' : 'Copied raw line') : 'Copy failed');
   }
+
+  const startIdx = Math.max(0, row.id - 3);
+  const endIdx = Math.min(rows.length - 1, row.id + 3);
+  const surroundings = rows.slice(startIdx, endIdx + 1);
 
   return (
     <aside className="detail-panel" aria-label={`Details for line ${row.lineNo}`}>
@@ -71,6 +100,16 @@ export function RowDetailPanel() {
         <button type="button" className="btn small" onClick={() => copy('raw')}>
           {isTrace ? 'Copy timeline' : 'Copy raw line'}
         </button>
+        {traceEntry && (
+          <button
+            type="button"
+            className="btn small"
+            title={`Filter to all log lines for ${traceEntry[0]}: ${traceEntry[1]}`}
+            onClick={() => setFilters({ search: `${traceEntry[0]}:"${traceEntry[1]}"` })}
+          >
+            Trace transaction
+          </button>
+        )}
         {filtered && (
           <button
             type="button"
@@ -89,7 +128,6 @@ export function RowDetailPanel() {
         {schema.map((c) => {
           if (!(c.key in row.values)) return null;
           const v = row.values[c.key] ?? null;
-          const filter = onlyThis(c.key, c.role, v);
           return (
             <div key={c.key} className="detail-field">
               <dt>
@@ -99,10 +137,25 @@ export function RowDetailPanel() {
               <dd className={v === null ? 'null' : undefined}>
                 {v === null ? '-' : c.role === 'message' ? <pre>{cellText(c, v, zone)}</pre> : cellText(c, v, zone)}
                 {(c.role === 'clientIp' || c.key === 'c-ip') && typeof v === 'string' && <IpInfo ip={v} />}
-                {filter && (
-                  <button type="button" className="only-this" title={`Show only rows with this ${c.label}`} onClick={filter}>
-                    Only this
-                  </button>
+                {v !== null && c.type !== 'timestamp' && c.role !== 'message' && (
+                  <span className="field-actions">
+                    <button
+                      type="button"
+                      className="only-this"
+                      title={`Show only rows with this ${c.label}`}
+                      onClick={() => filterByField(c.key, c.role, v, false)}
+                    >
+                      Only this
+                    </button>
+                    <button
+                      type="button"
+                      className="only-this exclude-this"
+                      title={`Exclude rows with this ${c.label}`}
+                      onClick={() => filterByField(c.key, c.role, v, true)}
+                    >
+                      Exclude
+                    </button>
+                  </span>
                 )}
               </dd>
             </div>
@@ -110,6 +163,40 @@ export function RowDetailPanel() {
         })}
       </dl>
       {isTrace && <FrebWaterfall timeline={row.raw} />}
+      {surroundings.length > 1 && (
+        <div className="detail-surroundings">
+          <h3>Surrounding lines ({surroundings.length} lines)</h3>
+          <div className="surroundings-list">
+            {surroundings.map((nr) => {
+              const isSelected = nr.id === row.id;
+              const statusVal = nr.values['sc-status'] ?? nr.values.status ?? nr.values['target-status'];
+              const levelVal = nr.values.level ?? nr.values.severity ?? nr.values.lvl;
+              const stCls = statusClass(statusVal ?? null);
+              const lvCls = levelClass(levelVal ?? null);
+              const pillCls = stCls || lvCls;
+              const badgeText =
+                statusVal !== undefined && statusVal !== null
+                  ? String(statusVal)
+                  : typeof levelVal === 'string'
+                    ? levelVal
+                    : null;
+
+              return (
+                <div
+                  key={nr.id}
+                  className={`surroundings-item ${isSelected ? 'active' : ''}`}
+                  onClick={() => select(nr.id)}
+                  title={`View details of line ${nr.lineNo}`}
+                >
+                  <span className="surroundings-line">L{nr.lineNo}</span>
+                  {badgeText && <span className={`pill small ${pillCls}`}>{badgeText}</span>}
+                  <span className="surroundings-text">{nr.raw}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <h3>{isTrace ? 'Event timeline' : 'Raw'}</h3>
       <pre className="detail-raw">{row.raw}</pre>
     </aside>

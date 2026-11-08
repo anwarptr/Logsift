@@ -2,6 +2,20 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.8.0 — 2026-11-08
+
+### New
+
+- **AWS ALB & Classic ELB access logs**: auto-detects and parses AWS Application Load Balancer and Classic ELB logs with target IPs, backend processing times, status codes, and trace IDs.
+- **Cloud JSON normalization (GCP & AWS)**: automatically unwraps GCP Cloud Logging (`jsonPayload`, `httpRequest`) and AWS CloudWatch (`@message`) structured logs into native fields so timestamps, latency, and status are immediately filterable.
+- **Structured search syntax**: query logs using qualifiers directly in the search box, including `status:500`, `status:>=400`, `status:4xx`, `duration:>500`, `level:error`, `method:POST`, `ip:`, `field:value`, negation `-term`, and exact `"phrase"`.
+- **Row context & transaction tracing**: inspect surrounding context (±3 lines) in a single click, and trace all events with the same request or trace ID from the row detail panel.
+- **Field filtering in row details**: 1-click "Only this" and "Exclude" buttons on all row detail fields to rapidly refine active filters.
+
+### Fixed
+
+- **Azure App Service (Kudu) 404 guidance**: actionable explanations and next steps when `LogFiles/http/RawLogs` or `LogFiles/Application` are not enabled in Azure yet.
+
 ## 0.7.2 — 2026-11-06
 
 ### Fixed

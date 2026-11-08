@@ -19,9 +19,27 @@ export const BIT_PATTERN = 1 << 29;
 export const BIT_TIME = 1 << 28;
 const FACET_BIT_SHIFT = 3;
 
+export type ComparisonOp = '=' | '!=' | '>' | '>=' | '<' | '<=';
+
+export interface FieldPredicate {
+  key: string;
+  negated: boolean;
+  op: ComparisonOp;
+  value: string;
+  numValue?: number;
+}
+
+export interface StructuredQuery {
+  terms: string[];
+  negatedTerms: string[];
+  predicates: FieldPredicate[];
+}
+
 export interface CompiledSearch {
-  /** Case-insensitive matcher for filtering, or null when there is no (valid) search. */
+  /** Case-insensitive matcher for regex mode, or null. */
   test: RegExp | null;
+  /** Structured field & text query, or null when regex mode or empty. */
+  structured: StructuredQuery | null;
   /** Global variant for highlighting matches in cells. */
   highlight: RegExp | null;
   error: string | null;
@@ -29,6 +47,172 @@ export interface CompiledSearch {
 
 export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Split search input into tokens, respecting double-quoted strings with backslash escapes. */
+export function parseSearchTokens(text: string): string[] {
+  const tokens: string[] = [];
+  const re = /(?:[^\s"]|"(?:[^"\\]|\\.)*")+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    tokens.push(m[0]!);
+  }
+  return tokens;
+}
+
+function unquote(s: string): string {
+  if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
+    return s.slice(1, -1).replace(/\\"/g, '"');
+  }
+  return s;
+}
+
+/**
+ * Parse structured search syntax:
+ *   status:500 status:>=400 status:5xx
+ *   duration:>500 duration:<=100
+ *   level:error level:warn
+ *   method:POST
+ *   ip:192.168.1.1
+ *   field:value field:"quoted value"
+ *   -term -"quoted term" -status:200
+ *   word "exact phrase"
+ */
+export function parseStructuredQuery(text: string): StructuredQuery | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const rawTokens = parseSearchTokens(trimmed);
+  if (rawTokens.length === 0) return null;
+
+  const terms: string[] = [];
+  const negatedTerms: string[] = [];
+  const predicates: FieldPredicate[] = [];
+
+  for (const rawToken of rawTokens) {
+    const colon = rawToken.indexOf(':');
+    // A colon that isn't part of a URL protocol (like "https://") or time ("12:30")
+    if (colon > 0 && !rawToken.slice(colon + 1).startsWith('//')) {
+      const pre = rawToken.slice(0, colon);
+      const negated = pre.startsWith('-');
+      const key = (negated ? pre.slice(1) : pre).toLowerCase();
+      if (/^[a-z_@][\w.-]*$/.test(key)) {
+        let valPart = unquote(rawToken.slice(colon + 1));
+        let op: ComparisonOp = '=';
+        const opMatch = /^(>=|<=|>|<|!=|=)(.*)$/.exec(valPart);
+        if (opMatch) {
+          op = opMatch[1] as ComparisonOp;
+          valPart = unquote(opMatch[2]!);
+        }
+        const n = Number(valPart);
+        const numValue = Number.isFinite(n) && valPart !== '' ? n : undefined;
+        predicates.push({ key, negated, op, value: valPart, numValue });
+        continue;
+      }
+    }
+
+    // Negated text term: -word or -"quoted phrase"
+    if (rawToken.startsWith('-') && rawToken.length > 1) {
+      const val = unquote(rawToken.slice(1)).toLowerCase();
+      if (val) negatedTerms.push(val);
+      continue;
+    }
+
+    // Positive text term: word or "quoted phrase"
+    const val = unquote(rawToken).toLowerCase();
+    if (val) terms.push(val);
+  }
+
+  return { terms, negatedTerms, predicates };
+}
+
+function compareNum(actual: number, op: ComparisonOp, target: number): boolean {
+  switch (op) {
+    case '=': return actual === target;
+    case '!=': return actual !== target;
+    case '>': return actual > target;
+    case '>=': return actual >= target;
+    case '<': return actual < target;
+    case '<=': return actual <= target;
+  }
+}
+
+export function matchesFieldPredicate(row: LogRow, index: LogIndex, r: number, p: FieldPredicate): boolean {
+  const k = p.key;
+
+  // 1. Status code (e.g. status:500, status:>=400, status:4xx)
+  if (k === 'status' || k === 'sc-status' || k === 'statuscode' || k === 'status_code') {
+    const st = index.status ? index.status[r]! : Number(row.values['sc-status'] ?? row.values.status ?? row.values.statusCode ?? row.values.status_code);
+    if (!Number.isFinite(st)) return false;
+    if (p.value.endsWith('xx') && /^\d/.test(p.value)) {
+      return Math.floor(st / 100) === Number(p.value[0]);
+    }
+    if (p.numValue !== undefined) {
+      return compareNum(st, p.op, p.numValue);
+    }
+    return String(st) === p.value;
+  }
+
+  // 2. Duration (e.g. duration:>500, duration:>=1000)
+  if (k === 'duration' || k === 'time-taken' || k === 'durationms' || k === 'duration_ms' || k === 'latency') {
+    const dur = index.duration ? index.duration[r]! : Number(row.values['time-taken'] ?? row.values.duration ?? row.values.durationMs ?? row.values.duration_ms);
+    if (!Number.isFinite(dur)) return false;
+    if (p.numValue !== undefined) {
+      return compareNum(dur, p.op, p.numValue);
+    }
+    return String(dur) === p.value;
+  }
+
+  // 3. Level (e.g. level:error, level:warn, level:info)
+  if (k === 'level' || k === 'severity' || k === 'lvl' || k === 'loglevel') {
+    const want = p.value.toLowerCase();
+    if (want === 'error' || want === 'err' || want === 'fatal' || want === 'crit') {
+      return isErrorRow(index, r);
+    }
+    const lv = row.values.level ?? row.values.severity ?? row.values.lvl ?? row.values.loglevel;
+    if (typeof lv === 'string') {
+      return lv.toLowerCase().startsWith(want);
+    }
+    return false;
+  }
+
+  // 4. HTTP Method (e.g. method:POST)
+  if (k === 'method' || k === 'cs-method' || k === 'requestmethod') {
+    const m = row.values['cs-method'] ?? row.values.method ?? row.values.requestMethod ?? row.values['req.method'];
+    return typeof m === 'string' && m.toLowerCase() === p.value.toLowerCase();
+  }
+
+  // 5. Client IP (e.g. ip:192.168.1.1, c-ip:10.0.*)
+  if (k === 'ip' || k === 'c-ip' || k === 'clientip' || k === 'client_ip') {
+    const ip = row.values['c-ip'] ?? row.values.clientIp ?? row.values.ip ?? row.values.client_ip ?? row.values['client.ip'] ?? row.values['httpRequest.remoteIp'];
+    if (typeof ip !== 'string') return false;
+    const sIp = ip.toLowerCase();
+    const sWant = p.value.toLowerCase();
+    if (sWant.includes('*')) {
+      const prefix = sWant.split('*')[0]!;
+      return sIp.startsWith(prefix);
+    }
+    return sIp.includes(sWant);
+  }
+
+  // 6. Arbitrary column lookup
+  let val = row.values[p.key];
+  if (val === undefined) {
+    const lk = p.key.toLowerCase();
+    for (const vk in row.values) {
+      if (vk.toLowerCase() === lk) {
+        val = row.values[vk];
+        break;
+      }
+    }
+  }
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'number' && p.numValue !== undefined && p.op !== '=') {
+    return compareNum(val, p.op, p.numValue);
+  }
+  const sVal = String(val).toLowerCase();
+  const sWant = p.value.toLowerCase();
+  if (p.op === '!=') return !sVal.includes(sWant);
+  return sVal.includes(sWant);
 }
 
 /**
@@ -70,13 +254,52 @@ export function isRiskyRegex(source: string): boolean {
 }
 
 export function compileSearch(text: string, regex: boolean): CompiledSearch {
-  if (!text) return { test: null, highlight: null, error: null };
-  const source = regex ? text : escapeRegExp(text);
-  try {
-    return { test: new RegExp(source, 'i'), highlight: new RegExp(source, 'gi'), error: null };
-  } catch (e) {
-    return { test: null, highlight: null, error: e instanceof Error ? e.message : 'Invalid regular expression' };
+  if (!text) return { test: null, structured: null, highlight: null, error: null };
+  if (regex) {
+    try {
+      return {
+        test: new RegExp(text, 'i'),
+        structured: null,
+        highlight: new RegExp(text, 'gi'),
+        error: null,
+      };
+    } catch (e) {
+      return {
+        test: null,
+        structured: null,
+        highlight: null,
+        error: e instanceof Error ? e.message : 'Invalid regular expression',
+      };
+    }
   }
+
+  const structured = parseStructuredQuery(text);
+  if (!structured) return { test: null, structured: null, highlight: null, error: null };
+
+  const hlTerms: string[] = [
+    ...structured.terms,
+    ...structured.predicates
+      .filter((p) => !p.negated && p.op === '=' && p.value.length > 0)
+      .map((p) => p.value),
+  ]
+    .filter((s) => s.length > 0)
+    .sort((a, b) => b.length - a.length);
+
+  let highlight: RegExp | null = null;
+  if (hlTerms.length > 0) {
+    try {
+      highlight = new RegExp(hlTerms.map(escapeRegExp).join('|'), 'gi');
+    } catch {
+      highlight = null;
+    }
+  }
+
+  return {
+    test: null,
+    structured,
+    highlight,
+    error: null,
+  };
 }
 
 export interface FilterOptions {
@@ -104,11 +327,65 @@ export function evaluateFilters(
   const facetBits = new Map<string, number>();
   index.facets.forEach((c, i) => facetBits.set(c.key, 1 << (FACET_BIT_SHIFT + i)));
 
-  // Global search over the raw line.
+  // Global search over the raw line & field query syntax.
   const search = compileSearch(f.search, f.regex);
   if (search.test) {
     const re = search.test;
     for (let i = 0; i < n; i++) if (!re.test(rows[i]!.raw)) mask[i]! |= BIT_OTHER;
+  } else if (search.structured) {
+    const { terms, negatedTerms, predicates } = search.structured;
+    const hasTerms = terms.length > 0;
+    const hasNeg = negatedTerms.length > 0;
+    const hasPreds = predicates.length > 0;
+
+    if (hasTerms || hasNeg || hasPreds) {
+      for (let i = 0; i < n; i++) {
+        if (hasPreds) {
+          let fail = false;
+          for (const p of predicates) {
+            const matches = matchesFieldPredicate(rows[i]!, index, i, p);
+            if (p.negated ? matches : !matches) {
+              fail = true;
+              break;
+            }
+          }
+          if (fail) {
+            mask[i]! |= BIT_OTHER;
+            continue;
+          }
+        }
+
+        if (hasTerms || hasNeg) {
+          const raw = rows[i]!.raw.toLowerCase();
+          if (hasNeg) {
+            let fail = false;
+            for (const nt of negatedTerms) {
+              if (raw.includes(nt)) {
+                fail = true;
+                break;
+              }
+            }
+            if (fail) {
+              mask[i]! |= BIT_OTHER;
+              continue;
+            }
+          }
+          if (hasTerms) {
+            let fail = false;
+            for (const pt of terms) {
+              if (!raw.includes(pt)) {
+                fail = true;
+                break;
+              }
+            }
+            if (fail) {
+              mask[i]! |= BIT_OTHER;
+              continue;
+            }
+          }
+        }
+      }
+    }
   }
 
   // Time range.

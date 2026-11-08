@@ -34,7 +34,8 @@ export function SearchBox() {
       <input
         id="global-search"
         type="search"
-        placeholder="Search…  ( / )"
+        placeholder="Search… e.g. status:500 -probe ( / )"
+        title='Search terms, e.g. status:500, duration:>500, level:error, -excluded, "exact phrase"'
         value={text}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'search-error' : undefined}

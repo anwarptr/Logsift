@@ -149,7 +149,26 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
       await bridge.list(path); // check it exists (and that Kudu answers) before opening it
     } catch (e) {
       setState({ kind: 'ready', app });
-      setError(`Can't open ${path || 'the home folder'}: ${e instanceof Error ? e.message : String(e)}`);
+      const raw = e instanceof Error ? e.message : String(e);
+      if (raw.includes('404')) {
+        if (path === 'LogFiles/Application') {
+          setError(
+            'LogFiles/Application does not exist yet (Kudu 404). In Azure App Service, Application logging is disabled by default. Turn on "Application logging (Filesystem)" in Azure Portal > App Service logs (set Level to Information), or select "All of LogFiles" instead.'
+          );
+        } else if (path === 'LogFiles/http/RawLogs') {
+          setError(
+            'LogFiles/http/RawLogs does not exist yet (Kudu 404). In Azure App Service, Web server logging is disabled by default. Turn on "Web server logging (File System)" in Azure Portal > App Service logs (and send a web request to generate the first log), or select "All of LogFiles" instead.'
+          );
+        } else if (path === 'site/wwwroot/Logs') {
+          setError(
+            'site/wwwroot/Logs does not exist yet (Kudu 404). The app has not written to this folder yet, or writes logs elsewhere. Try "All of LogFiles" instead.'
+          );
+        } else {
+          setError(`Folder "${path || 'home'}" was not found (Kudu 404). It may not exist yet on the server. Try "All of LogFiles" instead.`);
+        }
+      } else {
+        setError(`Can't open ${path || 'the home folder'}: ${raw}`);
+      }
       return;
     }
     await openFolder(new KuduDirHandle(bridge, path, `${app}: ${path || 'home'}`), { ...KUDU_LIMITS, remember: false });

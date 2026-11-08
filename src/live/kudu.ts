@@ -248,9 +248,9 @@ export class KuduDirHandle implements LiveDirHandle {
 
 /** Folders worth watching on an App Service (paths under the site's home). */
 export const KUDU_FOLDERS: { path: string; label: string; hint: string }[] = [
-  { path: 'LogFiles/Application', label: 'Application logs', hint: 'What the app logs with App Service logging turned on (LogFiles/Application)' },
+  { path: 'LogFiles/Application', label: 'Application logs', hint: 'What the app logs (requires "Application logging (Filesystem)" turned on in Azure)' },
   { path: 'site/wwwroot/Logs', label: "The app's own Logs folder", hint: 'Files the app writes itself, e.g. Serilog to Logs/ (site/wwwroot/Logs)' },
-  { path: 'LogFiles/http/RawLogs', label: 'Web server (IIS) logs', hint: 'Requests, status codes and times (LogFiles/http/RawLogs)' },
+  { path: 'LogFiles/http/RawLogs', label: 'Web server (IIS) logs', hint: 'Requests, status codes and times (requires "Web server logging" turned on in Azure)' },
   { path: 'LogFiles', label: 'All of LogFiles', hint: 'Every log App Service keeps, including failed request traces and the event log' },
 ];
 

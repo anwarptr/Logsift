@@ -46,6 +46,31 @@ describe('applyFilters: individual filters', () => {
     expect(count({ search: '(' })).toBe(0);
   });
 
+  it('structured search query syntax', () => {
+    // status predicates
+    expect(count({ search: 'status:200' })).toBe(3);
+    expect(count({ search: 'status:>=400' })).toBe(13);
+    expect(count({ search: 'status:4xx' })).toBe(13);
+    expect(count({ search: '-status:404' })).toBe(3);
+
+    // negated text terms
+    expect(count({ search: '-AlwaysOn' })).toBe(10);
+    expect(count({ search: '-"api.example.com"' })).toBe(0);
+
+    // duration predicates
+    expect(count({ search: 'duration:>1000' })).toBe(1);
+    expect(count({ search: 'duration:<=5' })).toBe(10);
+
+    // field lookup
+    expect(count({ search: 'c-ip:127.0.0.1' })).toBe(3);
+    expect(count({ search: 'c-ip:10.20.*' })).toBe(10);
+
+    // combined queries
+    expect(count({ search: 'status:200 duration:>1000' })).toBe(1);
+    expect(count({ search: 'status:200 -AlwaysOn' })).toBe(0);
+    expect(count({ search: 'status:404 10.20.0.11' })).toBe(4);
+  });
+
   it('regex search', () => {
     expect(count({ search: '^2026-03-14 09:13', regex: true })).toBe(8);
     expect(count({ search: '\\s200\\s', regex: true })).toBe(3);

@@ -1,3 +1,4 @@
+import { createAlbParser } from './alb';
 import { createApacheParser } from './apache';
 import { createCsvParser } from './csv';
 import { createCustomParser } from './custom';
@@ -27,6 +28,8 @@ export function createParser(format: LogFormat, pattern?: string): LineParser {
       return createWinEventParser();
     case 'apache':
       return createApacheParser();
+    case 'alb':
+      return createAlbParser();
     case 'jsonl':
       return createJsonlParser();
     case 'logfmt':

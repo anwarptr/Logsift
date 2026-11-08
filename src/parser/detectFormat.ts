@@ -4,6 +4,13 @@ import { isLogfmtLine } from './logfmt';
 import { isSyslogLine } from './syslog';
 import type { LogFormat } from './types';
 
+export const ALB_LINE_RE = /^(?:h2|http|https|ws|wss|grpc) \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z \S+ \S+ \S+ (?:-?\d+(?:\.\d+)?) /;
+export const CLASSIC_ELB_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z \S+ \d{1,3}(?:\.\d{1,3}){3}:\d+ \S+ (?:-?\d+(?:\.\d+)?) /;
+
+export function isAlbLine(line: string): boolean {
+  return ALB_LINE_RE.test(line) || CLASSIC_ELB_RE.test(line);
+}
+
 const SAMPLE_SIZE = 50;
 const MATCH_RATIO = 0.6;
 
@@ -39,6 +46,7 @@ export function detectFormat(lines: readonly string[]): LogFormat {
 
   const ratio = (pred: (l: string) => boolean) => sample.filter(pred).length / sample.length;
   if (ratio((l) => APACHE_LINE_RE.test(l)) >= MATCH_RATIO) return 'apache';
+  if (ratio(isAlbLine) >= MATCH_RATIO) return 'alb';
   if (ratio(isJsonObject) >= MATCH_RATIO) return 'jsonl';
   if (ratio(isLogfmtLine) >= MATCH_RATIO) return 'logfmt';
   if (ratio(isSyslogLine) >= MATCH_RATIO) return 'syslog';

@@ -478,9 +478,13 @@ mark {
   background: var(--accent-soft);
   text-decoration: none;
 }
-/* "Only this" in row details: a text link that filters to the field's value. */
-.only-this {
+/* "Only this" and "Exclude" in row details: text links that filter or exclude values */
+.field-actions {
+  display: inline-flex;
+  gap: 6px;
   margin-left: 8px;
+}
+.only-this {
   padding: 0;
   border: 0;
   background: none;
@@ -494,6 +498,57 @@ mark {
 }
 .only-this:hover {
   text-decoration: underline;
+}
+.only-this.exclude-this {
+  color: var(--fg-muted);
+}
+.only-this.exclude-this:hover {
+  color: var(--err);
+}
+
+/* Surroundings in row details */
+.detail-surroundings {
+  margin-top: 14px;
+}
+.surroundings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+.surroundings-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.3;
+}
+.surroundings-item:hover {
+  background: var(--surface);
+}
+.surroundings-item.active {
+  background: var(--accent-soft);
+  font-weight: 600;
+  border-left: 2px solid var(--accent);
+}
+.surroundings-line {
+  color: var(--fg-muted);
+  flex: none;
+  min-width: 44px;
+}
+.surroundings-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
 }
 
 /* Endpoints view */

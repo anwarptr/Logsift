@@ -55,14 +55,26 @@ export const KEY_ROLES: Record<string, ColumnRole> = {
   'res.statuscode': 'status',
   responsetime: 'duration',
   response_time: 'duration',
+  // Google Cloud Logging (httpRequest after flattening, plus textPayload).
+  'httprequest.status': 'status',
+  'httprequest.requesturl': 'uri',
+  'httprequest.requestmethod': 'method',
+  'httprequest.remoteip': 'clientIp',
+  'httprequest.useragent': 'userAgent',
+  'httprequest.latency': 'duration',
+  textpayload: 'message',
+  // AWS CloudWatch Logs Insights
+  '@message': 'message',
+  '@logstream': 'logger',
+  '@requestid': 'logger',
 };
 
 /** pino/bunyan numeric levels. */
 const NUMERIC_LEVELS: Record<number, string> = { 10: 'TRACE', 20: 'DEBUG', 30: 'INFO', 40: 'WARN', 50: 'ERROR', 60: 'FATAL' };
 const LEVEL_KEYS = new Set(['level', 'lvl', 'severity', 'loglevel']);
 
-/** Nested request/response objects whose fields get their own columns ("req.method", "res.statusCode"). */
-const FLATTEN_KEYS = ['req', 'res', 'request', 'response'];
+/** Nested request/response objects whose fields get their own columns ("req.method", "res.statusCode", "httpRequest.status"). */
+const FLATTEN_KEYS = ['req', 'res', 'request', 'response', 'httpRequest'];
 
 /** A leading level word in container output that has no other layout ("ERROR boom", "[WARN] x"). */
 const LEADING_LEVEL_RE =
@@ -102,6 +114,72 @@ function fromDocker(rec: Record<string, unknown>): Record<string, unknown> | nul
     out.message = l ? text.slice(l[0].length) : text;
   }
   return out;
+}
+
+/**
+ * AWS CloudWatch Logs Insights: {"@timestamp": "...", "@message": "...", "@logStream": "..."}.
+ * When @message holds a JSON object, unpack it into columns; when it holds a structured text line,
+ * extract level, logger and message.
+ */
+function fromCloudWatch(rec: Record<string, unknown>): Record<string, unknown> | null {
+  if (typeof rec['@message'] !== 'string' || !('@timestamp' in rec || '@logStream' in rec)) return null;
+  const text = rec['@message'].replace(/\r?\n$/, '');
+  const { '@message': _raw, ...out } = rec;
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const inner: unknown = JSON.parse(trimmed);
+      if (isPlainObject(inner)) {
+        for (const k in inner) if (!(k in out)) out[k] = inner[k];
+        return out;
+      }
+    } catch {
+      // Not JSON: fall through to text parse
+    }
+  }
+  const m = GENERIC_LINE_RE.exec(text);
+  if (m) {
+    const e = refineEntry(m[2], m[3], m[4] ?? '');
+    if (e.level) out.level = e.level;
+    if (e.logger) out.logger = e.logger;
+    Object.assign(out, e.extra);
+    out.message = e.message;
+  } else {
+    const l = LEADING_LEVEL_RE.exec(text);
+    if (l) out.level = normalizeLevel(l[1]!);
+    out.message = l ? text.slice(l[0].length) : text;
+  }
+  return out;
+}
+
+/**
+ * GCP Cloud Logging: {"jsonPayload": {...}} or {"textPayload": "..."}.
+ * Unpack jsonPayload properties into columns; map textPayload to message.
+ */
+function fromGcp(rec: Record<string, unknown>): Record<string, unknown> {
+  let out = rec;
+  if (isPlainObject(out.jsonPayload)) {
+    const { jsonPayload, ...rest } = out;
+    out = { ...rest };
+    for (const k in jsonPayload) if (!(k in out)) out[k] = jsonPayload[k];
+  }
+  if (typeof out.textPayload === 'string' && !('message' in out)) {
+    out = { ...out, message: out.textPayload };
+  }
+  return out;
+}
+
+/** Parse duration string ("0.125s", "125ms", or numeric seconds/ms) to numeric ms. */
+export function parseLatencyMs(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  const mSec = /^(\d+(?:\.\d+)?)s$/i.exec(s);
+  if (mSec) return Math.round(parseFloat(mSec[1]!) * 10000) / 10;
+  const mMs = /^(\d+(?:\.\d+)?)ms$/i.exec(s);
+  if (mMs) return parseFloat(mMs[1]!);
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Convert a JSON timestamp value (ISO string, epoch seconds or epoch ms) to epoch ms. */
@@ -181,6 +259,8 @@ export function createJsonlParser(): LineParser {
     if (!isPlainObject(obj)) return bad(line, lineNo, 'Not a JSON object');
     let rec = fromClef(obj) ?? obj;
     rec = fromDocker(rec) ?? rec;
+    rec = fromCloudWatch(rec) ?? rec;
+    rec = fromGcp(rec);
     // Serilog's JsonFormatter nests event properties under "Properties": give each its own column.
     if (isPlainObject(rec.Properties)) {
       const { Properties: props, ...rest } = rec;
@@ -225,6 +305,10 @@ export function createJsonlParser(): LineParser {
       else v = JSON.stringify(raw);
       const lower = k.toLowerCase();
       if (typeof v === 'number' && LEVEL_KEYS.has(lower) && NUMERIC_LEVELS[v]) v = NUMERIC_LEVELS[v]!;
+      if (lower.endsWith('.latency') || lower === 'latency') {
+        const ms = parseLatencyMs(v);
+        if (ms !== null) v = ms;
+      }
       // Avoid clobbering the synthetic timestamp column with an unrelated "timestamp" key.
       const key = k === 'timestamp' ? 'timestamp_raw' : k;
       schema.observe(key, v, eventIsMessage && k === 'event' ? 'message' : KEY_ROLES[lower]);
