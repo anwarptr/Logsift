@@ -31,6 +31,9 @@ What changed in each Logsift release, newest first. The in-app Help shows the la
   - **Saved searches**: save your custom search queries in browser storage with one-click re-use.
 - **Interactive time histogram drag**:
   - Dragging across the requests-over-time histogram displays a live tooltip with exact start/end timestamps and duration span.
+- **Return to start screen (Close log)**:
+  - 1-click **"Close log"** button in the header toolbar and the Live Bar to stop watching and return directly to the start/home screen.
+  - Clicking the **"Logsift"** header title resets the workspace and navigates back to the drop zone.
 
 ### Fixed
 

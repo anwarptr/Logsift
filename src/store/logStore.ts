@@ -13,7 +13,7 @@ import {
   type WatchTarget,
 } from '../live/watcher';
 import { saveFolder } from '../live/savedFolder';
-import { appendLive, startParse } from '../worker/client';
+import { appendLive, cancelParse, startParse } from '../worker/client';
 import { clearLayout, insertWithLayout, layoutKey, loadLayout, saveLayout } from './columnLayouts';
 import { liveCheckDelayMs } from './perfStats';
 import { DEFAULT_COMPARE, type CompareSetting } from '../utils/compare';
@@ -165,6 +165,8 @@ export interface LogState {
   setCustomPattern(pattern: string): void;
   setError(message: string | null): void;
 
+  /** Close the open log or watch and return to the home screen. */
+  closeLog(): void;
   setColumnVisible(key: string, visible: boolean): void;
   moveColumn(key: string, toIndex: number): void;
   setColumnWidth(key: string, width: number): void;
@@ -828,6 +830,42 @@ export const useLogStore = create<LogState>()((set, get) => {
 
     setError(message) {
       set({ error: message });
+    },
+
+    closeLog() {
+      stopWatcher();
+      flushColumnSave();
+      cancelParse();
+      set({
+        status: 'idle',
+        error: null,
+        file: null,
+        sources: [],
+        files: [],
+        format: null,
+        detectedFormat: null,
+        formatOverride: 'auto',
+        parseMs: null,
+        rows: [],
+        malformed: [],
+        meta: [],
+        schema: [],
+        logTimeZone: null,
+        live: null,
+        selectedId: null,
+        sort: null,
+        tab: 'rows',
+        filters: EMPTY_FILTERS,
+        paused: null,
+        columnOrder: [],
+        hiddenColumns: {},
+        columnWidths: {},
+      });
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.search = '';
+        window.history.replaceState(null, '', url.pathname + (url.hash || ''));
+      }
     },
 
     setColumnVisible(key, visible) {

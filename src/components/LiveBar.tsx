@@ -131,6 +131,14 @@ export function LiveBar() {
         <button type="button" className="btn small" title="Stop watching (the rows stay)" onClick={stop}>
           Stop
         </button>
+        <button
+          type="button"
+          className="btn small ghost"
+          title="Stop watching and return to home page"
+          onClick={() => useLogStore.getState().closeLog()}
+        >
+          Close
+        </button>
       </span>
       {showFiles && (
         <div ref={popoverRef} className="live-files-popover popover" role="dialog" aria-label="Watched files">

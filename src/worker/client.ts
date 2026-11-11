@@ -53,6 +53,14 @@ export function startParse(
   } satisfies WorkerRequest);
 }
 
+/** Cancel the current parsing job in the worker. */
+export function cancelParse(): void {
+  if (currentJob && worker) {
+    worker.postMessage({ type: 'cancel', jobId: currentJob } satisfies WorkerRequest);
+    currentHandler = null;
+  }
+}
+
 /** Send bytes appended to a file of the current live job; the reply is an 'appended' message. */
 export function appendLive(name: string, blob: Blob, modified: number, final: boolean | 'lines' = false): void {
   getWorker().postMessage({ type: 'append', jobId: currentJob, name, blob, modified, final } satisfies WorkerRequest);

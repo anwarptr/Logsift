@@ -45,6 +45,7 @@ export default function App() {
   const setSidebarOpen = useLogStore((s) => s.setSidebarOpen);
   const insightsOpen = useLogStore((s) => s.insightsOpen);
   const setInsightsOpen = useLogStore((s) => s.setInsightsOpen);
+  const closeLog = useLogStore((s) => s.closeLog);
   // Focus mode only makes sense with data on screen.
   const focus = useLogStore((s) => s.focusMode) && hasData;
 
@@ -55,7 +56,20 @@ export default function App() {
     <div className={'app' + (focus ? ' focus-mode' : '')}>
       {/* Hidden by CSS in focus mode rather than unmounted: its DropZone owns the window-wide drop/paste handlers. */}
       <header className="app-header">
-        <h1 className="app-title">Logsift</h1>
+        <h1 className="app-title">
+          {hasData ? (
+            <button
+              type="button"
+              className="app-title-btn"
+              title="Close log and return to home page"
+              onClick={closeLog}
+            >
+              Logsift
+            </button>
+          ) : (
+            'Logsift'
+          )}
+        </h1>
         <div className="header-actions">
           {hasData && (
             <button
@@ -70,6 +84,16 @@ export default function App() {
             </button>
           )}
           {hasData && <DropZone compact />}
+          {hasData && (
+            <button
+              type="button"
+              className="btn small ghost"
+              title="Close current log and return to home page"
+              onClick={closeLog}
+            >
+              Close log
+            </button>
+          )}
           <button type="button" className="btn small" title="How to use Logsift (?)" onClick={() => setHelpOpen(true)}>
             Help
           </button>

@@ -9,6 +9,7 @@ import type { LogSource } from '../../src/worker/streamParse';
 
 // jsdom has no Worker: run the same streaming parser in-process instead (as parse.worker.ts does).
 vi.mock('../../src/worker/client', () => ({
+  cancelParse: () => {},
   startParse: (
     sources: LogSource[],
     format: LogFormat | undefined,
@@ -91,6 +92,16 @@ describe('App with the sample IIS log', () => {
     const ips = within(sidebar).getByRole('list', { name: 'c-ip values' });
     expect(ips.textContent).toContain('10.20.0.12');
     expect(within(sidebar).getByRole('button', { name: /4xx\s*13/ })).toBeTruthy();
+  });
+
+  it('closes the open log and returns to the home page when Close log is clicked', async () => {
+    await loadSample();
+    const closeBtn = screen.getByRole('button', { name: 'Close log' });
+    expect(closeBtn).toBeTruthy();
+    act(() => {
+      closeBtn.click();
+    });
+    expect(screen.getByText('Drop log files here')).toBeTruthy();
   });
 
   it('quick toggles filter rows and show chips', async () => {
