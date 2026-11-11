@@ -1,0 +1,6 @@
+{"timestamp":"2026-11-11T12:00:00.000Z","service":"api-gateway","action":"POST /api/checkout","traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01","durationMs":320,"status":504}
+{"timestamp":"2026-11-11T12:00:00.015Z","service":"auth-service","action":"Validate JWT token","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","durationMs":35,"status":200}
+{"timestamp":"2026-11-11T12:00:00.060Z","service":"order-service","action":"Reserve cart inventory #9821","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","durationMs":40,"status":200}
+{"timestamp":"2026-11-11T12:00:00.110Z","service":"payment-svc","action":"Invoke payment gateway charge","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","durationMs":180,"status":200}
+{"timestamp":"2026-11-11T12:00:00.290Z","service":"payment-svc","action":"GatewayTimeout: Stripe API call timed out after 180ms","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","level":"ERROR","status":504}
+{"timestamp":"2026-11-11T12:00:00.320Z","service":"api-gateway","action":"Completed POST /api/checkout with error","traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01","level":"ERROR","status":504}

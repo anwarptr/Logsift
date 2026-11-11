@@ -6,6 +6,12 @@ What changed in each Logsift release, newest first. The in-app Help shows the la
 
 ### New
 
+- **Distributed Trace Waterfall**:
+  - Automatically correlates log entries sharing a trace or request ID across multiple files and services into an interactive chronological waterfall timeline.
+  - Cross-format trace ID normalization supports W3C Trace Context (`traceparent`), AWS X-Ray (`Root=1-...`), Jaeger/Uber (`<trace-id>:<span-id>:...`), Serilog compact format (`@tr`, `@sp`), and standard identifiers (`trace_id`, `request_id`, `correlation_id`, `x-request-id`).
+  - Embedded inline waterfall in the Row Details panel displaying relative start offsets (`+X ms`), service badges, action descriptions, HTTP status tags, explicit durations, and error indicators.
+  - 1-click navigation to select and highlight corresponding rows directly in the main log table.
+  - Full-screen visual timeline modal featuring a proportional time ruler, live span search/filtering, active span inspector, and formatted Markdown table export for GitHub issues, Jira tickets, and incident triage.
 - **Heterogeneous multi-format log ingestion**:
   - Open and watch multiple files of different formats simultaneously (e.g. IIS W3C access logs, application JSON lines, and Syslog).
   - Independent per-file format detection: each file is parsed with its dedicated parser instead of forcing a single shared parser.

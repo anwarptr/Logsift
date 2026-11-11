@@ -8,19 +8,8 @@ import { rowToJson } from '../utils/export';
 import { cellText, levelClass, statusClass } from './cells';
 import { FrebWaterfall } from './FrebWaterfall';
 import { IpInfo } from './IpInfo';
-
-const TRACE_KEYS = [
-  'trace-id',
-  'traceid',
-  'trace_id',
-  'x-amzn-trace-id',
-  'requestid',
-  'request_id',
-  'correlationid',
-  'correlation_id',
-  'spanid',
-  'span_id',
-];
+import { extractTraceEntry } from '../utils/traceWaterfall';
+import { TraceWaterfall } from './TraceWaterfall';
 
 export function RowDetailPanel() {
   const selectedId = useLogStore((s) => s.selectedId);
@@ -49,9 +38,7 @@ export function RowDetailPanel() {
 
   if (!row) return null;
 
-  const traceEntry = Object.entries(row.values).find(
-    ([k, v]) => TRACE_KEYS.includes(k.toLowerCase()) && typeof v === 'string' && v.trim().length > 0,
-  );
+  const traceEntry = extractTraceEntry(row.values);
 
   /** Filter or exclude by this field value. Uses facets when available, else search syntax. */
   function filterByField(key: string, role: string | undefined, v: unknown, exclude = false) {
@@ -171,6 +158,7 @@ export function RowDetailPanel() {
         })}
       </dl>
       {isTrace && <FrebWaterfall timeline={row.raw} />}
+      {!isTrace && traceEntry && <TraceWaterfall traceKey={traceEntry[0]} traceVal={traceEntry[1]} />}
       {surroundings.length > 1 && (
         <div className="detail-surroundings">
           <h3>Surrounding lines ({surroundings.length} lines)</h3>
