@@ -1,4 +1,4 @@
-import type { LiveDirHandle } from './watcher';
+import type { LiveDirHandle, LiveFileHandle } from './watcher';
 
 /**
  * The last opened folder's handle, kept in IndexedDB (handles can be stored there, not in
@@ -48,9 +48,48 @@ export async function saveFolder(dir: LiveDirHandle): Promise<void> {
 /** Whether this browser can open folders (File System Access API). */
 export const canOpenFolders = (): boolean => typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
+/** Whether this browser can pick individual file handles to watch (File System Access API). */
+export const canOpenFilesWithHandles = (): boolean => typeof window !== 'undefined' && 'showOpenFilePicker' in window;
+
+/** Ask for file handles to watch live; null when cancelled. */
+export async function pickFilesToWatch(): Promise<LiveFileHandle[] | null> {
+  const w = (typeof window !== 'undefined' ? window : globalThis) as unknown as {
+    showOpenFilePicker(o?: {
+      id?: string;
+      mode?: 'read';
+      multiple?: boolean;
+      types?: { description: string; accept: Record<string, string[]> }[];
+    }): Promise<LiveFileHandle[]>;
+  };
+  try {
+    return await w.showOpenFilePicker({
+      id: 'logsift-files',
+      mode: 'read',
+      multiple: true,
+      types: [
+        {
+          description: 'Log and text files',
+          accept: {
+            'text/*': ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.csv', '.tsv', '.out', '.err', '.trace'],
+          },
+        },
+        {
+          description: 'All files',
+          accept: {
+            '*/*': [],
+          },
+        },
+      ],
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return null;
+    throw e;
+  }
+}
+
 /** Ask for the folder picker; null when cancelled. */
 export async function pickFolder(): Promise<LiveDirHandle | null> {
-  const w = window as unknown as { showDirectoryPicker(o?: { id?: string; mode?: 'read' }): Promise<LiveDirHandle> };
+  const w = (typeof window !== 'undefined' ? window : globalThis) as unknown as { showDirectoryPicker(o?: { id?: string; mode?: 'read' }): Promise<LiveDirHandle> };
   try {
     return await w.showDirectoryPicker({ id: 'logsift-logs', mode: 'read' });
   } catch (e) {

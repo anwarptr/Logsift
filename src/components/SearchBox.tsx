@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { compileSearch } from '../filters/applyFilters';
 import { useLogStore } from '../store/logStore';
+import { SearchPresets } from './SearchPresets';
 
 const DEBOUNCE_MS = 200;
 
@@ -59,6 +60,13 @@ export function SearchBox() {
       >
         .*
       </button>
+      <SearchPresets
+        currentQuery={text}
+        onSelect={(query) => {
+          setText(query);
+          setFilters({ search: query });
+        }}
+      />
       {error && (
         <span id="search-error" className="search-error" role="alert">
           Invalid regex: {error}

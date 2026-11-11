@@ -52,14 +52,21 @@ describe('applyFilters: individual filters', () => {
     expect(count({ search: 'status:>=400' })).toBe(13);
     expect(count({ search: 'status:4xx' })).toBe(13);
     expect(count({ search: '-status:404' })).toBe(3);
+    expect(count({ search: '!status:404' })).toBe(3);
+    expect(count({ search: 'status:200..300' })).toBe(3);
+    expect(count({ search: 'status:400..500' })).toBe(13);
 
     // negated text terms
     expect(count({ search: '-AlwaysOn' })).toBe(10);
+    expect(count({ search: '!AlwaysOn' })).toBe(10);
     expect(count({ search: '-"api.example.com"' })).toBe(0);
 
-    // duration predicates
+    // duration predicates & units
     expect(count({ search: 'duration:>1000' })).toBe(1);
+    expect(count({ search: 'duration:>1s' })).toBe(1);
     expect(count({ search: 'duration:<=5' })).toBe(10);
+    expect(count({ search: 'duration:<=5ms' })).toBe(10);
+    expect(count({ search: 'duration:500ms..5s' })).toBe(1);
 
     // field lookup
     expect(count({ search: 'c-ip:127.0.0.1' })).toBe(3);

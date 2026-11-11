@@ -130,6 +130,12 @@
   stroke-width: 1;
   pointer-events: none;
 }
+.drag-edge {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+  pointer-events: none;
+}
 .chart-tooltip {
   position: absolute;
   top: 26px;
@@ -142,6 +148,14 @@
   padding: 5px 8px;
   font-size: 12px;
   z-index: 4;
+}
+.drag-tooltip {
+  width: auto;
+  min-width: 170px;
+  max-width: 260px;
+  text-align: center;
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 .err-text {
   color: var(--err);

@@ -33,7 +33,7 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
-const CALL_TIMEOUT_MS = 30_000;
+const CALL_TIMEOUT_MS = 60_000;
 
 /** The connection to the bookmarklet in the Kudu tab. */
 export class KuduBridge {
@@ -143,12 +143,17 @@ export class KuduBridge {
   }
 }
 
-const LOG_EXT_RE = /\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|gz|zip)$/i;
+const LOG_EXT_RE = /\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|out|err|trace|gz|zip)([._-]\w+)?$/i;
 /** Names of settings, keys and secrets files, never read even when their type is allowed. */
 const SECRET_NAME_RE =
   /(appsettings|settings|web\.config|\.config$|^\.env|secret|password|passwd|connection-?string|credential|private|(^|[-_.])(keys?|tokens?)[-_.])/i;
-/** A folder named as a log folder: "log", "logs", or ending in one after a separator ("app-logs", "App_Log"). */
-const LOG_DIR_RE = /^(.*[-_. ])?logs?$/i;
+const NOT_LOG_WORDS = /^(blog|catalog|dialog|prolog|travelog)s?$/i;
+
+/** A folder named as a log folder: "log", "logs", "RawLogs", "AppLogs", or ending in one after a separator ("app-logs", "App_Log"). */
+export const isLogFolderName = (name: string): boolean => {
+  if (NOT_LOG_WORDS.test(name)) return false;
+  return /^[a-z0-9_-]*logs?$/i.test(name);
+};
 
 /** Path segments: no "..", no "." and none made of dots and spaces only (".. " is ".." to some file systems). */
 const segmentsOf = (path: string): string[] | null => {
@@ -156,7 +161,7 @@ const segmentsOf = (path: string): string[] | null => {
   return segments.some((s) => /^[. ]+$/.test(s)) ? null : segments;
 };
 
-const isLogDir = (segments: string[]) => segments[0] === 'LogFiles' || segments.some((s) => LOG_DIR_RE.test(s));
+const isLogDir = (segments: string[]) => segments[0] === 'LogFiles' || segments.some(isLogFolderName);
 
 /**
  * Whether a folder on the App Service may be listed, which is all the bookmarklet lists (it has the same
@@ -176,6 +181,8 @@ export function isKuduLogFolder(path: string): boolean {
 export function isKuduLogPath(path: string): boolean {
   const segments = segmentsOf(path);
   if (segments === null) return false;
+  // Ignore internal Kudu SCM traces, internal Git traces, CrashDumps, and DetailedErrors
+  if (segments.some((s) => /^(kudu|git|crashdumps?|detailederrors)$/i.test(s))) return false;
   const file = segments.pop() ?? '';
   if (!LOG_EXT_RE.test(file) || SECRET_NAME_RE.test(file)) return false;
   return isLogDir(segments);
@@ -225,7 +232,11 @@ export class KuduDirHandle implements LiveDirHandle {
   async *values(): AsyncIterable<KuduDirHandle | LiveFileHandle> {
     for (const e of await this.entries()) {
       const p = join(this.path, e.name);
-      if (e.dir) yield new KuduDirHandle(this.bridge, p, e.name);
+      if (e.dir) {
+        if (!/^(kudu|git|crashdumps?|detailederrors)$/i.test(e.name)) {
+          yield new KuduDirHandle(this.bridge, p, e.name);
+        }
+      }
       // Only log files: the bookmarklet would refuse to read the others anyway.
       else if (isKuduLogPath(p)) yield this.file(e.name);
     }
@@ -259,7 +270,36 @@ export const KUDU_LIMITS = { maxFiles: 10, maxBytes: 64 * 1024 * 1024 };
 
 /** Clean a folder path typed by the user: forward slashes, no leading or trailing slash, no "..". */
 export function cleanKuduPath(input: string): string | null {
-  const p = input.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
+  let p = input.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
   if (p.split('/').some((s) => /^[. ]+$/.test(s))) return null;
+  // If the user typed "http/RawLogs", "http", "RawLogs", "Application", or "W3SVC..." without LogFiles/, auto-prefix with "LogFiles/"
+  if (/^(http(\/.*)?|rawlogs|application(\/.*)?|w3svc.*)$/i.test(p)) {
+    p = p.toLowerCase().startsWith('rawlogs') ? `LogFiles/http/${p}` : `LogFiles/${p}`;
+  }
   return /^[\w .()/-]*$/.test(p) ? p : null;
+}
+
+export type KuduFilterKind = 'no-eventlog' | 'all' | 'app-only' | 'iis-only' | 'eventlog-only';
+
+export const isEventLogName = (name: string): boolean => /eventlog/i.test(name);
+
+export const isIisLogName = (name: string): boolean => {
+  const lower = name.toLowerCase();
+  return lower.startsWith('u_ex') || lower.includes('w3svc') || lower.includes('rawlogs');
+};
+
+export function getKuduFilterFn(kind: KuduFilterKind, acceptBase: (name: string) => boolean): (name: string) => boolean {
+  switch (kind) {
+    case 'no-eventlog':
+      return (name) => acceptBase(name) && !isEventLogName(name);
+    case 'app-only':
+      return (name) => acceptBase(name) && !isEventLogName(name) && !isIisLogName(name);
+    case 'iis-only':
+      return (name) => acceptBase(name) && isIisLogName(name);
+    case 'eventlog-only':
+      return (name) => acceptBase(name) && isEventLogName(name);
+    case 'all':
+    default:
+      return acceptBase;
+  }
 }

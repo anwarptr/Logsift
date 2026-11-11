@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import sampleIis from '../../fixtures/sample-iis.log?raw';
-import { canOpenFolders, ensureReadPermission, loadSavedFolder, pickFolder } from '../live/savedFolder';
+import { canOpenFilesWithHandles, canOpenFolders, ensureReadPermission, loadSavedFolder, pickFilesToWatch, pickFolder } from '../live/savedFolder';
 import type { LiveDirHandle } from '../live/watcher';
 import { ACCEPTED_EXTENSIONS, useLogStore } from '../store/logStore';
 import { formatBytes, formatNumber } from '../utils/format';
@@ -22,9 +22,11 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
   const [pasting, setPasting] = useState(false);
   const [kuduSetup, setKuduSetup] = useState(false);
   const openFolder = useLogStore((s) => s.openFolder);
+  const openFileHandles = useLogStore((s) => s.openFileHandles);
   const setError = useLogStore((s) => s.setError);
   const [savedFolder, setSavedFolder] = useState<LiveDirHandle | null>(null);
   const folders = canOpenFolders();
+  const filesWatchable = canOpenFilesWithHandles();
 
   useEffect(() => {
     if (!folders) return;
@@ -44,6 +46,16 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
       }
     } catch (e) {
       setError(`Could not open the folder: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const chooseFilesToWatch = async () => {
+    try {
+      const handles = await pickFilesToWatch();
+      if (handles && handles.length > 0) {
+        await openFileHandles(handles);
+      }
+    } catch (e) {
+      setError(`Could not watch the files: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
   const reopenFolder = async (dir: LiveDirHandle) => {
@@ -156,12 +168,24 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
     </button>
   );
 
+  const watchFilesButton = filesWatchable && (
+    <button
+      type="button"
+      className="btn"
+      title="Pick log files and watch them live for new lines (Chrome, Edge)"
+      onClick={() => void chooseFilesToWatch()}
+    >
+      Watch file(s)…
+    </button>
+  );
+
   if (compact) {
     return (
       <>
         <button type="button" className="btn" onClick={() => inputRef.current?.click()}>
           Open files…
         </button>
+        {watchFilesButton}
         {folderButton}
         {pasteButton}
         {input}
@@ -184,11 +208,12 @@ export function DropZone({ compact = false }: { compact?: boolean }) {
         />
       </svg>
       <h2>Drop log files here</h2>
-      <p className="muted">.log, .txt, .json, .csv and .xml (IIS trace, Windows event log) files, or .gz/.zip archives of them. Nothing leaves your computer.</p>
+      <p className="muted">.log, .txt, .json, .csv, .xml, .out, .err, .trace files, or .gz/.zip archives. Nothing leaves your computer.</p>
       <div className="dropzone-actions">
         <button type="button" className="btn primary" onClick={() => inputRef.current?.click()}>
           Choose files…
         </button>
+        {watchFilesButton}
         {folderButton}
         {pasteButton}
         <button type="button" className="btn" onClick={loadSample}>

@@ -46,7 +46,14 @@ export async function listFolder(dir: LiveDirHandle, accept: (name: string) => b
     for await (const h of d.values()) {
       if (h.kind === 'file') {
         if (accept(h.name)) out.push({ path: prefix + h.name, handle: h });
-      } else if (depth < MAX_DEPTH && !h.name.startsWith('.') && h.name !== 'node_modules') {
+      } else if (
+        depth < MAX_DEPTH &&
+        !h.name.startsWith('.') &&
+        h.name !== 'node_modules' &&
+        h.name.toLowerCase() !== 'kudu' &&
+        h.name.toLowerCase() !== 'git' &&
+        !/^(crashdumps?|detailederrors)$/i.test(h.name)
+      ) {
         await walk(h, `${prefix}${h.name}/`, depth + 1);
       }
     }

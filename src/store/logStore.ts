@@ -17,6 +17,8 @@ import { appendLive, startParse } from '../worker/client';
 import { clearLayout, insertWithLayout, layoutKey, loadLayout, saveLayout } from './columnLayouts';
 import { liveCheckDelayMs } from './perfStats';
 import { DEFAULT_COMPARE, type CompareSetting } from '../utils/compare';
+import { mapConcurrent } from '../utils/async';
+import { notifyDesktop, playAlertChime } from '../utils/sound';
 import type { WorkerResponse } from '../worker/protocol';
 import type { LogSource } from '../worker/streamParse';
 import { loadPrefs, savePrefs, type Density, type ThemePref, type TimeDisplay } from './prefs';
@@ -46,6 +48,8 @@ interface LiveInit {
   /** Files of the folder left out on purpose (older ones): not watched. */
   ignore: Set<string>;
   notice?: string;
+  /** File filter function used to accept files in the watched directory. */
+  accept?: (name: string) => boolean;
 }
 
 /** How a folder is opened: limits on what is read at first, and whether to offer it for Reopen. */
@@ -56,6 +60,8 @@ export interface FolderOpenOptions {
   maxBytes?: number;
   /** Remember it for Reopen on the start page (default true; a remote folder can't be). */
   remember?: boolean;
+  /** Custom filter to accept files in the folder (defaults to isAcceptedFile). */
+  accept?: (name: string) => boolean;
 }
 
 /** Live tail status, shown in the live bar. */
@@ -73,6 +79,10 @@ export interface LiveState {
   newRows: number;
   notice: string | null;
   error: string | null;
+  /** Alert with sound & notification when new errors arrive. */
+  alertErrors?: boolean;
+  /** Maximum rows to keep in memory (default 50,000). */
+  maxRows?: number;
 }
 
 export interface LogState {
@@ -140,6 +150,8 @@ export interface LogState {
   stopLive(): void;
   setLivePaused(paused: boolean): void;
   setLiveFollowing(following: boolean): void;
+  setLiveAlertErrors(alertErrors: boolean): void;
+  clearLiveBuffer(): void;
   /** A note in the live bar (e.g. why no more lines arrive). */
   setLiveNotice(notice: string | null): void;
   setFilters(patch: Partial<FilterState>): void;
@@ -172,7 +184,25 @@ export interface LogState {
   setCompare(c: CompareSetting): void;
 }
 
-export const ACCEPTED_EXTENSIONS = ['.log', '.txt', '.json', '.jsonl', '.ndjson', '.clef', '.xml', '.csv', '.tsv', '.gz', '.zip'];
+export const ACCEPTED_EXTENSIONS = [
+  '.log',
+  '.txt',
+  '.json',
+  '.jsonl',
+  '.ndjson',
+  '.clef',
+  '.xml',
+  '.csv',
+  '.tsv',
+  '.out',
+  '.err',
+  '.trace',
+  '.gz',
+  '.zip',
+];
+
+/** Matches rotated logs like app.log.1, access.log.2026-11-08, service.out.old, etc. */
+const ROTATED_RE = /\.(log|txt|json|jsonl|ndjson|clef|xml|csv|tsv|out|err|trace)[._-]\w+$/i;
 
 /** Display name for text pasted instead of a file (also the base of export file names). */
 export const PASTED_NAME = 'pasted-text.txt';
@@ -249,7 +279,8 @@ async function readStable(handle: LiveFileHandle): Promise<File> {
 
 export function isAcceptedFile(name: string): boolean {
   const lower = name.toLowerCase();
-  return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+  if (ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext))) return true;
+  return ROTATED_RE.test(lower);
 }
 
 /** Noisy columns that start hidden (they can be shown from the column chooser). */
@@ -357,9 +388,28 @@ export const useLogStore = create<LogState>()((set, get) => {
     if (!buf || (buf.rows.length === 0 && buf.malformed.length === 0 && buf.meta.length === 0)) return;
     liveBuffer = { rows: [], malformed: [], meta: [], schema: null };
     const s = get();
+
+    // Alert chime / desktop notification on errors if enabled
+    if (s.live?.alertErrors) {
+      const isError = (r: LogRow) => {
+        const st = Number(r.values['sc-status'] ?? r.values.status ?? r.values.statusCode ?? r.values.status_code);
+        if (Number.isFinite(st)) return st >= 400;
+        const lv = String(r.values.level ?? r.values.severity ?? r.values.lvl ?? r.values.loglevel ?? '').toLowerCase();
+        return lv.startsWith('err') || lv.startsWith('fatal') || lv.startsWith('crit');
+      };
+      if (buf.malformed.length > 0 || buf.rows.some(isError)) {
+        playAlertChime();
+        notifyDesktop('Logsift Alert', `New error in ${s.live.label}`);
+      }
+    }
+
     // Rows of several files are interleaved by time; keep the selection on the same row.
     const selected = s.selectedId === null ? null : s.rows[s.selectedId];
-    const rows = s.files.length > 1 || liveInit?.kind === 'folder' ? mergeAppend(s.rows, buf.rows) : appendRows(s.rows, buf.rows);
+    let rows = s.files.length > 1 || liveInit?.kind === 'folder' ? mergeAppend(s.rows, buf.rows) : appendRows(s.rows, buf.rows);
+    const maxRows = s.live?.maxRows ?? 50_000;
+    if (rows.length > maxRows) {
+      rows = rows.slice(rows.length - maxRows);
+    }
     const selectedId = selected ? selected.id : s.selectedId;
     const schema = buf.schema ?? s.schema;
     set({
@@ -388,7 +438,7 @@ export const useLogStore = create<LogState>()((set, get) => {
       dir: init.dir,
       targets,
       ignore: init.ignore,
-      accept: isAcceptedFile,
+      accept: init.accept ?? isAcceptedFile,
       delayMs: liveCheckDelayMs,
       send: (path, blob, modified, final) =>
         new Promise<number>((resolve) => {
@@ -421,6 +471,8 @@ export const useLogStore = create<LogState>()((set, get) => {
             newRows: 0,
             notice: live.notice ?? null,
             error: null,
+            alertErrors: false,
+            maxRows: 50_000,
           }
         : null,
     });
@@ -514,42 +566,71 @@ export const useLogStore = create<LogState>()((set, get) => {
     entries: FolderEntry[],
     init: Omit<LiveInit, 'handles' | 'ignore'>,
     emptyError: string,
-    limits: { maxFiles?: number; maxBytes?: number } = {},
+    limits: FolderOpenOptions = {},
   ) {
-    let withFiles: { path: string; handle: LiveFileHandle; file: File }[];
-    try {
-      withFiles = await Promise.all(entries.map(async (e) => ({ ...e, file: await e.handle.getFile() })));
-    } catch (e) {
-      set({ error: `Could not read the files: ${e instanceof Error ? e.message : String(e)}` });
-      return;
-    }
+    const withFiles: { path: string; handle: LiveFileHandle; file: File }[] = [];
+    await mapConcurrent(entries, 6, async (e) => {
+      try {
+        const file = await e.handle.getFile();
+        withFiles.push({ ...e, file });
+      } catch {
+        // Skip entries that cannot be queried
+      }
+    });
+
     const { chosen, skipped } = chooseRecent(withFiles, limits.maxFiles, limits.maxBytes);
     if (chosen.length === 0) {
       set({ error: emptyError });
       return;
     }
-    // Copy each file now: a File from a handle can't be read once the log is written to again, which
-    // would break a long parse, or a re-parse with another format later.
-    let copies: File[];
-    try {
-      copies = await Promise.all(chosen.map((e) => readStable(e.handle)));
-    } catch (e) {
-      set({ error: `Could not read the files: ${e instanceof Error ? e.message : String(e)}` });
+
+    // Copy files with bounded concurrency (max 4 parallel downloads) so Kudu/network is not choked
+    const copies: { entry: (typeof chosen)[0]; file: File }[] = [];
+    const failed: { path: string; error: string }[] = [];
+
+    await mapConcurrent(chosen, 4, async (e) => {
+      try {
+        const copy = await readStable(e.handle);
+        copies.push({ entry: e, file: copy });
+      } catch (err) {
+        failed.push({ path: e.path, error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    if (copies.length === 0) {
+      const firstError = failed[0]?.error ?? 'Kudu did not answer';
+      set({ error: `Could not read the files: ${firstError}` });
       return;
     }
-    const chosenPaths = new Set(chosen.map((e) => e.path));
+
+    const successfulEntries = copies.map((c) => c.entry);
+    const successfulCopies = copies.map((c) => c.file);
+    const chosenPaths = new Set(successfulEntries.map((e) => e.path));
     const ignore = new Set(entries.map((e) => e.path).filter((p) => !chosenPaths.has(p)));
-    const size = copies.reduce((sum, f) => sum + f.size, 0);
-    const notice = skipped
-      ? `Opened the ${chosen.length} most recently changed files; ${skipped} older ${skipped === 1 ? 'file was' : 'files were'} left out.`
+    const size = successfulCopies.reduce((sum, f) => sum + f.size, 0);
+
+    let notice = skipped
+      ? `Opened the ${successfulEntries.length} most recently changed files; ${skipped} older ${skipped === 1 ? 'file was' : 'files were'} left out.`
       : undefined;
-    const name = init.kind === 'folder' ? `${init.label}/ (${chosen.length} file${chosen.length === 1 ? '' : 's'})` : chosen.length === 1 ? chosen[0]!.path : `${chosen.length} files`;
+
+    if (failed.length > 0) {
+      const failMsg = `${failed.length} ${failed.length === 1 ? 'file was' : 'files were'} skipped (could not be read: Kudu did not answer).`;
+      notice = notice ? `${notice} ${failMsg}` : failMsg;
+    }
+
+    const name =
+      init.kind === 'folder'
+        ? `${init.label}/ (${successfulEntries.length} file${successfulEntries.length === 1 ? '' : 's'})`
+        : successfulEntries.length === 1
+          ? successfulEntries[0]!.path
+          : `${successfulEntries.length} files`;
+
     parse(
-      chosen.map((e, i) => ({ name: e.path, blob: copies[i]! })),
+      successfulEntries.map((e, i) => ({ name: e.path, blob: successfulCopies[i]! })),
       { name, size },
       get().formatOverride,
       true,
-      { ...init, notice, ignore, handles: new Map(chosen.map((e) => [e.path, e.handle])) },
+      { ...init, accept: limits.accept, notice, ignore, handles: new Map(successfulEntries.map((e) => [e.path, e.handle])) },
     );
   }
 
@@ -660,31 +741,37 @@ export const useLogStore = create<LogState>()((set, get) => {
     },
 
     async openFolder(dir, opts = {}) {
+      const acceptFn = opts.accept ?? isAcceptedFile;
       let entries: FolderEntry[];
       try {
-        entries = await listFolder(dir, isAcceptedFile);
+        entries = await listFolder(dir, acceptFn);
       } catch (e) {
         set({ error: `Could not read the folder "${dir.name}": ${e instanceof Error ? e.message : String(e)}` });
         return;
       }
       if (opts.remember !== false) void saveFolder(dir);
+      const isKudu = dir.name.includes(':') || /scm\./i.test(dir.name);
+      const emptyError = isKudu
+        ? `The folder "${dir.name}" has no log files with content. On Azure App Service, Application Logging (Filesystem) and Web Server Logging are disabled by default: enable them in Azure Portal > App Service logs, or try "The app's own Logs folder".`
+        : `The folder "${dir.name}" has no log files with content.`;
       await openLive(
         entries,
         { kind: 'folder', label: dir.name, dir },
-        `The folder "${dir.name}" has no log files (.log, .txt, .json, .xml, .csv, .gz or .zip) with content.`,
+        emptyError,
         opts,
       );
     },
 
     async openFileHandles(handles) {
       const ok = handles.filter((h) => isAcceptedFile(h.name));
-      if (ok.length === 0) {
-        set({ error: 'None of these files can be opened: choose .log, .txt, .json, .xml, .csv, .gz or .zip files.' });
+      const toOpen = ok.length > 0 ? ok : handles;
+      if (toOpen.length === 0) {
+        set({ error: 'No files selected to open.' });
         return;
       }
       await openLive(
-        ok.map((h) => ({ path: h.name, handle: h })),
-        { kind: 'files', label: ok.length === 1 ? ok[0]!.name : `${ok.length} files`, dir: null },
+        toOpen.map((h) => ({ path: h.name, handle: h })),
+        { kind: 'files', label: toOpen.length === 1 ? toOpen[0]!.name : `${toOpen.length} files`, dir: null },
         'The files are empty.',
       );
     },
@@ -702,6 +789,22 @@ export const useLogStore = create<LogState>()((set, get) => {
 
     setLiveFollowing(following) {
       set((s) => ({ live: s.live && { ...s.live, following } }));
+    },
+
+    setLiveAlertErrors(alertErrors) {
+      set((s) => ({ live: s.live && { ...s.live, alertErrors } }));
+    },
+
+    clearLiveBuffer() {
+      const s = get();
+      if (!s.live) return;
+      set({
+        rows: [],
+        malformed: [],
+        meta: [],
+        selectedId: null,
+        live: { ...s.live, newRows: 0 },
+      });
     },
 
     setLiveNotice(notice) {

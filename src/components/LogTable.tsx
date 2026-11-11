@@ -4,6 +4,7 @@ import type { ColumnDef, LogRow } from '../parser';
 import { useLogStore } from '../store/logStore';
 import { useDisplayZone } from '../store/useView';
 import type { DisplayZone } from '../utils/timezone';
+import { formatNumber } from '../utils/format';
 import { renderCell } from './cells';
 
 export const ROW_HEIGHT = { compact: 24, comfortable: 34 } as const;
@@ -87,14 +88,36 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
   const followSetting = useLogStore((s) => s.live?.following === true);
   const following = followSetting && sort === null;
   const setFollowing = useLogStore((s) => s.setLiveFollowing);
+
+  const [unseenCount, setUnseenCount] = useState(0);
+  const lastIndicesCountRef = useRef(indices.length);
+
   useEffect(() => {
-    if (following && indices.length > 0) virtualizer.scrollToIndex(indices.length - 1, { align: 'end' });
+    if (following) {
+      setUnseenCount(0);
+      lastIndicesCountRef.current = indices.length;
+      if (indices.length > 0) virtualizer.scrollToIndex(indices.length - 1, { align: 'end' });
+    } else {
+      const added = indices.length - lastIndicesCountRef.current;
+      if (added > 0) setUnseenCount((c) => c + added);
+      lastIndicesCountRef.current = indices.length;
+    }
   }, [following, indices.length, virtualizer]);
+
   const onScroll = () => {
     const el = scrollRef.current;
     if (!live || sort !== null || !el) return;
     const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight <= rowHeight * 2;
-    if (atEnd !== followSetting) setFollowing(atEnd);
+    if (atEnd !== followSetting) {
+      setFollowing(atEnd);
+      if (atEnd) setUnseenCount(0);
+    }
+  };
+
+  const resumeFollowing = () => {
+    setFollowing(true);
+    setUnseenCount(0);
+    if (indices.length > 0) virtualizer.scrollToIndex(indices.length - 1, { align: 'end' });
   };
 
   // Keep the cursor in range when the view shrinks.
@@ -185,80 +208,94 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
   const activeId = indices[cursor];
 
   return (
-    <div
-      ref={scrollRef}
-      className={`table-scroll density-${density}`}
-      role="grid"
-      aria-label="Log rows"
-      aria-rowcount={indices.length + 1}
-      aria-colcount={columns.length}
-      aria-activedescendant={activeId !== undefined ? `row-${activeId}` : undefined}
-      tabIndex={0}
-      onKeyDown={onKeyDown}
-      onScroll={onScroll}
-    >
-      <div className="thead" role="rowgroup" style={{ width: totalWidth }}>
-        <div className="tr header" role="row" aria-rowindex={1}>
-          {columns.map((c) => {
-            const sorted = sort?.key === c.key ? sort.dir : null;
-            return (
-              <div
-                key={c.key}
-                role="columnheader"
-                className="th"
-                style={{ width: widths[c.key] }}
-                aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
-              >
-                <button
-                  type="button"
-                  className="th-btn"
-                  title={`Sort by ${c.label}${c.derived ? ' (derived)' : ''}`}
-                  onClick={() => toggleSort(c.key)}
+    <div className="log-table-container" style={{ position: 'relative', flex: '1 1 auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div
+        ref={scrollRef}
+        className={`table-scroll density-${density}`}
+        role="grid"
+        aria-label="Log rows"
+        aria-rowcount={indices.length + 1}
+        aria-colcount={columns.length}
+        aria-activedescendant={activeId !== undefined ? `row-${activeId}` : undefined}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        onScroll={onScroll}
+      >
+        <div className="thead" role="rowgroup" style={{ width: totalWidth }}>
+          <div className="tr header" role="row" aria-rowindex={1}>
+            {columns.map((c) => {
+              const sorted = sort?.key === c.key ? sort.dir : null;
+              return (
+                <div
+                  key={c.key}
+                  role="columnheader"
+                  className="th"
+                  style={{ width: widths[c.key] }}
+                  aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
                 >
-                  <span className="th-label">{c.label}</span>
-                  <span className="sort-ind" aria-hidden="true">
-                    {sorted === 'asc' ? '▲' : sorted === 'desc' ? '▼' : ''}
-                  </span>
-                </button>
-                <span
-                  className="col-resizer"
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-label={`Resize ${c.label}`}
-                  onPointerDown={(e) => startResize(e, c.key)}
-                  onDoubleClick={() => setColumnWidth(c.key, 120)}
-                />
-              </div>
+                  <button
+                    type="button"
+                    className="th-btn"
+                    title={`Sort by ${c.label}${c.derived ? ' (derived)' : ''}`}
+                    onClick={() => toggleSort(c.key)}
+                  >
+                    <span className="th-label">{c.label}</span>
+                    <span className="sort-ind" aria-hidden="true">
+                      {sorted === 'asc' ? '▲' : sorted === 'desc' ? '▼' : ''}
+                    </span>
+                  </button>
+                  <span
+                    className="col-resizer"
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={`Resize ${c.label}`}
+                    onPointerDown={(e) => startResize(e, c.key)}
+                    onDoubleClick={() => setColumnWidth(c.key, 120)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="tbody" role="rowgroup" style={{ height: virtualizer.getTotalSize(), width: totalWidth }}>
+          {items.map((vi) => {
+            const idx = indices[vi.index]!;
+            const row = rows[idx]!;
+            const dur = durationKey ? row.values[durationKey] : null;
+            return (
+              <Row
+                key={row.id}
+                row={row}
+                columns={columns}
+                widths={widths}
+                highlight={highlight}
+                zone={zone}
+                selected={row.id === selectedId}
+                active={vi.index === cursor}
+                slow={typeof dur === 'number' && dur > slowMs}
+                top={vi.start}
+                height={rowHeight}
+                ariaIndex={vi.index + 2}
+                onClick={onRowClick}
+                viewIndex={vi.index}
+              />
             );
           })}
         </div>
+        {indices.length === 0 && <div className="table-empty">No rows match the current filters.</div>}
       </div>
-      <div className="tbody" role="rowgroup" style={{ height: virtualizer.getTotalSize(), width: totalWidth }}>
-        {items.map((vi) => {
-          const idx = indices[vi.index]!;
-          const row = rows[idx]!;
-          const dur = durationKey ? row.values[durationKey] : null;
-          return (
-            <Row
-              key={row.id}
-              row={row}
-              columns={columns}
-              widths={widths}
-              highlight={highlight}
-              zone={zone}
-              selected={row.id === selectedId}
-              active={vi.index === cursor}
-              slow={typeof dur === 'number' && dur > slowMs}
-              top={vi.start}
-              height={rowHeight}
-              ariaIndex={vi.index + 2}
-              onClick={onRowClick}
-              viewIndex={vi.index}
-            />
-          );
-        })}
-      </div>
-      {indices.length === 0 && <div className="table-empty">No rows match the current filters.</div>}
+      {live && !following && unseenCount > 0 && (
+        <button
+          type="button"
+          className="resume-scroll-pill"
+          onClick={resumeFollowing}
+          aria-label="Resume auto-scroll"
+        >
+          <span className="pill-arrow" aria-hidden="true">↓</span>
+          <span>Resume auto-scroll</span>
+          <span className="pill-count">({formatNumber(unseenCount)} new {unseenCount === 1 ? 'line' : 'lines'})</span>
+        </button>
+      )}
     </div>
   );
 }

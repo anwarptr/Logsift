@@ -77,6 +77,11 @@ export function Histogram({ data, onSelect }: { data: Timeline; onSelect(from: n
   const hovered = hover !== null && hover < n ? { i: hover, total: counts[hover]!, err: errors[hover]! } : null;
   const dragX = drag ? Math.min(drag.x0, drag.x1) : 0;
   const dragW = drag ? Math.abs(drag.x1 - drag.x0) : 0;
+  const dragA = drag ? xToBucket(Math.min(drag.x0, drag.x1)) : null;
+  const dragB = drag ? xToBucket(Math.max(drag.x0, drag.x1)) : null;
+  const dragStartTs = dragA !== null ? start + dragA * bucketMs : 0;
+  const dragEndTs = dragB !== null ? start + (dragB + 1) * bucketMs - 1 : 0;
+  const dragSpanMs = dragB !== null && dragA !== null ? dragEndTs - dragStartTs + 1 : 0;
 
   return (
     <div className="histogram" ref={wrapRef}>
@@ -135,8 +140,28 @@ export function Histogram({ data, onSelect }: { data: Timeline; onSelect(from: n
         <text className="tick" x={width - M.right} y={HEIGHT - 4} textAnchor="end">
           {axisLabel(start + span, span, zone)}
         </text>
-        {drag && dragW > 0 && <rect className="drag-sel" x={dragX} y={M.top} width={dragW} height={innerH} />}
+        {drag && dragW > 0 && (
+          <g className="drag-group">
+            <rect className="drag-sel" x={dragX} y={M.top} width={dragW} height={innerH} />
+            <line className="drag-edge" x1={dragX} x2={dragX} y1={M.top} y2={M.top + innerH} />
+            <line className="drag-edge" x1={dragX + dragW} x2={dragX + dragW} y1={M.top} y2={M.top + innerH} />
+          </g>
+        )}
       </svg>
+      {drag && dragW > 4 && dragA !== null && dragB !== null && (
+        <div
+          className="chart-tooltip drag-tooltip"
+          style={{ left: Math.min(width - 220, Math.max(0, dragX + dragW / 2 - 110)) }}
+          role="status"
+        >
+          <div className="mono">
+            {formatTimestamp(dragStartTs, zone).slice(11, 19)} → {formatTimestamp(dragEndTs, zone).slice(11, 19)}
+          </div>
+          <div>
+            <strong>{formatDuration(dragSpanMs)}</strong> · release to filter
+          </div>
+        </div>
+      )}
       {hovered && !drag && (
         <div
           className="chart-tooltip"

@@ -2,6 +2,37 @@
 
 What changed in each Logsift release, newest first. The in-app Help shows the latest entries too.
 
+## 0.8.1 — 2026-11-11
+
+### New
+
+- **Live Watch capabilities & Kudu filters**:
+  - Configurable file limits (5, 10, 25, 50, or up to 100 files; 32 to 512 MB).
+  - Filter presets (*Exclude eventlog.xml*, *All files*, *App logs only*, *IIS logs only*, and *eventlog.xml only*).
+  - Path normalization: typing `http/RawLogs`, `RawLogs`, or `Application` in the Kudu dialog automatically prefixes `LogFiles/` and resolves to the server path.
+  - Recognizes `RawLogs`, `AppLogs`, and other CamelCase log folders.
+- **Direct file watching & expanded formats**:
+  - **"Watch File(s)…"** button directly on the drop zone to tail specific local files.
+  - Added support for `.out`, `.err`, `.trace`, and rotated logs (`.log.1`, `.out.bak`).
+- **Live tail usability**:
+  - **Resume auto-scroll floating pill**: when scrolling up to inspect earlier lines, auto-scroll pauses and an unobtrusive `↓ Resume auto-scroll (N new lines)` pill appears to jump back with one click.
+  - **Live error alerts**: optional sound chime (synthesized via Web Audio API) and desktop notifications when new errors or malformed lines arrive.
+  - **Rolling buffer & clear screen**: configurable buffer limit (50,000 lines) to prevent memory bloat, plus a **Clear** button in the Live Bar to wipe displayed lines without stopping the watch.
+  - **Live throughput meter**: displays real-time arrival rate (`· N lines/s`) and an interactive `[N files ▾]` popover to inspect watched files, sizes, and arrival status.
+- **Search enhancements & presets**:
+  - **Search query syntax**: supports numeric ranges (`status:500..599`, `duration:100ms..2s`), duration units (`1s`, `500ms`, `1m`), and exclamation mark negation (`!status:200`, `!healthcheck`).
+  - **Query presets**: built-in presets for 4xx/5xx errors, slow requests, auth failures, and healthcheck exclusions.
+  - **Saved searches**: save your custom search queries in browser storage with one-click re-use.
+- **Interactive time histogram drag**:
+  - Dragging across the requests-over-time histogram displays a live tooltip with exact start/end timestamps and duration span.
+
+### Fixed
+
+- **Bounded concurrency for remote logs**: downloads up to 100 files in batches of 4 with a 60s timeout, avoiding browser socket starvation on Kudu.
+- **Fault-tolerant loading**: partial load success if individual files time out or fail.
+- **Excluded platform diagnostic folders**: automatically ignores `CrashDumps/`, `DetailedErrors/`, `kudu/`, and `git/` from folder scans so old crash dumps or deployment traces are never picked up as logs.
+- **Guidance for empty App Service folders**: explains that Azure App Service disables application and web server filesystem logging by default.
+
 ## 0.8.0 — 2026-11-08
 
 ### New

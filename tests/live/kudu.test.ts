@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { cleanKuduPath, isKuduLogFolder, isKuduLogPath, KUDU_ORIGIN_RE, KuduBridge, KuduDirHandle } from '../../src/live/kudu';
+import {
+  cleanKuduPath,
+  getKuduFilterFn,
+  isEventLogName,
+  isIisLogName,
+  isKuduLogFolder,
+  isKuduLogPath,
+  KUDU_ORIGIN_RE,
+  KuduBridge,
+  KuduDirHandle,
+} from '../../src/live/kudu';
 import { kuduBookmarklet, kuduScript } from '../../src/live/kuduBookmarklet';
 import { listFolder, LiveWatcher } from '../../src/live/watcher';
 
@@ -173,6 +183,15 @@ describe('Kudu bookmarklet reads log files only', () => {
     ['LogFiles/http/RawLogs/u_ex261105.log', true],
     ['LogFiles/eventlog.xml', true],
     ['LogFiles/Application/diag.txt', true],
+    ['LogFiles/kudu/trace/2026-10-01T07-06-30_0efc6b_001_Startup_GET__0s.xml', false],
+    ['LogFiles/Git/trace.log', false],
+    ['LogFiles/CrashDumps/w3wp_2740_2025-06-03T09_09_50.log', false],
+    ['LogFiles/crashdump/w3wp.log', false],
+    ['LogFiles/DetailedErrors/ErrorPage.htm', false],
+    ['site/wwwroot/Logs/catalina.out', true],
+    ['site/wwwroot/Logs/error.err', true],
+    ['site/wwwroot/Logs/trace.log.1', true],
+    ['site/wwwroot/Logs/app.out.bak', true],
     ['site/wwwroot/appsettings.json', false],
     ['site/wwwroot/appsettings.Production.json', false],
     ['site/wwwroot/web.config', false],
@@ -205,6 +224,7 @@ describe('Kudu bookmarklet reads log files only', () => {
     ['LogFiles', true],
     ['LogFiles/http/RawLogs', true],
     ['site/wwwroot/Logs', true],
+    ['site/wwwroot/RawLogs', true],
     ['site/wwwroot/App_Data/logs/2026', true],
     ['', false],
     ['site/wwwroot', false],
@@ -294,6 +314,9 @@ describe('Kudu paths', () => {
   it('cleans typed folder paths', () => {
     expect(cleanKuduPath(' \\site\\wwwroot\\Logs\\ ')).toBe('site/wwwroot/Logs');
     expect(cleanKuduPath('LogFiles//Application/')).toBe('LogFiles/Application');
+    expect(cleanKuduPath('http/RawLogs')).toBe('LogFiles/http/RawLogs');
+    expect(cleanKuduPath('RawLogs')).toBe('LogFiles/http/RawLogs');
+    expect(cleanKuduPath('Application')).toBe('LogFiles/Application');
     expect(cleanKuduPath('../secrets')).toBeNull();
     expect(cleanKuduPath('a/<script>')).toBeNull();
   });
@@ -304,5 +327,48 @@ describe('Kudu paths', () => {
     expect(KUDU_ORIGIN_RE.test('https://shop-api.azurewebsites.net')).toBe(false);
     expect(KUDU_ORIGIN_RE.test('https://evil.example/scm.azurewebsites.net')).toBe(false);
     expect(KUDU_ORIGIN_RE.test('http://shop-api.scm.azurewebsites.net')).toBe(false);
+  });
+});
+
+describe('Kudu log filters (handling eventlog)', () => {
+  const dummyAccept = (n: string) => n.endsWith('.log') || n.endsWith('.txt') || n.endsWith('.xml') || n.endsWith('.json');
+
+  it('detects eventlog file names', () => {
+    expect(isEventLogName('eventlog.xml')).toBe(true);
+    expect(isEventLogName('eventlog_20261108.xml')).toBe(true);
+    expect(isEventLogName('app-eventlog.log')).toBe(true);
+    expect(isEventLogName('app.log')).toBe(false);
+    expect(isEventLogName('u_ex261108.log')).toBe(false);
+  });
+
+  it('detects IIS log file names', () => {
+    expect(isIisLogName('u_ex261108.log')).toBe(true);
+    expect(isIisLogName('W3SVC1/u_ex261108.log')).toBe(true);
+    expect(isIisLogName('app.log')).toBe(false);
+    expect(isIisLogName('eventlog.xml')).toBe(false);
+  });
+
+  it('filters out eventlog.xml when no-eventlog is selected', () => {
+    const fn = getKuduFilterFn('no-eventlog', dummyAccept);
+    expect(fn('eventlog.xml')).toBe(false);
+    expect(fn('u_ex261108.log')).toBe(true);
+    expect(fn('diag.txt')).toBe(true);
+  });
+
+  it('filters by app-only, iis-only, and eventlog-only', () => {
+    const appFn = getKuduFilterFn('app-only', dummyAccept);
+    expect(appFn('diag.txt')).toBe(true);
+    expect(appFn('u_ex261108.log')).toBe(false);
+    expect(appFn('eventlog.xml')).toBe(false);
+
+    const iisFn = getKuduFilterFn('iis-only', dummyAccept);
+    expect(iisFn('u_ex261108.log')).toBe(true);
+    expect(iisFn('diag.txt')).toBe(false);
+    expect(iisFn('eventlog.xml')).toBe(false);
+
+    const evtFn = getKuduFilterFn('eventlog-only', dummyAccept);
+    expect(evtFn('eventlog.xml')).toBe(true);
+    expect(evtFn('u_ex261108.log')).toBe(false);
+    expect(evtFn('diag.txt')).toBe(false);
   });
 });

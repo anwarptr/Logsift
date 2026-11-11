@@ -19,7 +19,7 @@ export const BIT_PATTERN = 1 << 29;
 export const BIT_TIME = 1 << 28;
 const FACET_BIT_SHIFT = 3;
 
-export type ComparisonOp = '=' | '!=' | '>' | '>=' | '<' | '<=';
+export type ComparisonOp = '=' | '!=' | '>' | '>=' | '<' | '<=' | '..';
 
 export interface FieldPredicate {
   key: string;
@@ -27,6 +27,7 @@ export interface FieldPredicate {
   op: ComparisonOp;
   value: string;
   numValue?: number;
+  numValueEnd?: number;
 }
 
 export interface StructuredQuery {
@@ -67,15 +68,32 @@ function unquote(s: string): string {
   return s;
 }
 
+/** Parse a numeric string with optional time units: "500", "500ms", "2.5s", "1m". */
+export function parseNumWithUnits(s: string): number | undefined {
+  const m = /^(\d+(?:\.\d+)?)\s*(ms|s|m|h)?$/i.exec(s.trim());
+  if (!m) return undefined;
+  const val = Number(m[1]);
+  if (!Number.isFinite(val)) return undefined;
+  const unit = (m[2] || '').toLowerCase();
+  switch (unit) {
+    case 's': return Math.round(val * 1000);
+    case 'm': return Math.round(val * 60000);
+    case 'h': return Math.round(val * 3600000);
+    case 'ms':
+    default:
+      return val;
+  }
+}
+
 /**
  * Parse structured search syntax:
- *   status:500 status:>=400 status:5xx
- *   duration:>500 duration:<=100
+ *   status:500 status:>=400 status:5xx status:500..599
+ *   duration:>500 duration:<=100 duration:>1s duration:200..800
  *   level:error level:warn
  *   method:POST
  *   ip:192.168.1.1
  *   field:value field:"quoted value"
- *   -term -"quoted term" -status:200
+ *   -term -"quoted term" -status:200 !error !status:200
  *   word "exact phrase"
  */
 export function parseStructuredQuery(text: string): StructuredQuery | null {
@@ -93,25 +111,44 @@ export function parseStructuredQuery(text: string): StructuredQuery | null {
     // A colon that isn't part of a URL protocol (like "https://") or time ("12:30")
     if (colon > 0 && !rawToken.slice(colon + 1).startsWith('//')) {
       const pre = rawToken.slice(0, colon);
-      const negated = pre.startsWith('-');
+      const negated = pre.startsWith('-') || pre.startsWith('!');
       const key = (negated ? pre.slice(1) : pre).toLowerCase();
       if (/^[a-z_@][\w.-]*$/.test(key)) {
         let valPart = unquote(rawToken.slice(colon + 1));
+        // Check for range: e.g. status:500..599 or duration:100ms..2s
+        const rangeIdx = valPart.indexOf('..');
+        if (rangeIdx > 0) {
+          const startStr = valPart.slice(0, rangeIdx);
+          const endStr = valPart.slice(rangeIdx + 2);
+          const nStart = parseNumWithUnits(startStr);
+          const nEnd = parseNumWithUnits(endStr);
+          if (nStart !== undefined && nEnd !== undefined) {
+            predicates.push({
+              key,
+              negated,
+              op: '..',
+              value: valPart,
+              numValue: Math.min(nStart, nEnd),
+              numValueEnd: Math.max(nStart, nEnd),
+            });
+            continue;
+          }
+        }
+
         let op: ComparisonOp = '=';
         const opMatch = /^(>=|<=|>|<|!=|=)(.*)$/.exec(valPart);
         if (opMatch) {
           op = opMatch[1] as ComparisonOp;
           valPart = unquote(opMatch[2]!);
         }
-        const n = Number(valPart);
-        const numValue = Number.isFinite(n) && valPart !== '' ? n : undefined;
+        const numValue = parseNumWithUnits(valPart);
         predicates.push({ key, negated, op, value: valPart, numValue });
         continue;
       }
     }
 
-    // Negated text term: -word or -"quoted phrase"
-    if (rawToken.startsWith('-') && rawToken.length > 1) {
+    // Negated text term: -word, !word, -"quoted phrase", !"quoted phrase"
+    if ((rawToken.startsWith('-') || rawToken.startsWith('!')) && rawToken.length > 1) {
       const val = unquote(rawToken.slice(1)).toLowerCase();
       if (val) negatedTerms.push(val);
       continue;
@@ -133,6 +170,7 @@ function compareNum(actual: number, op: ComparisonOp, target: number): boolean {
     case '>=': return actual >= target;
     case '<': return actual < target;
     case '<=': return actual <= target;
+    default: return false;
   }
 }
 
@@ -146,6 +184,9 @@ export function matchesFieldPredicate(row: LogRow, index: LogIndex, r: number, p
     if (p.value.endsWith('xx') && /^\d/.test(p.value)) {
       return Math.floor(st / 100) === Number(p.value[0]);
     }
+    if (p.op === '..' && p.numValue !== undefined && p.numValueEnd !== undefined) {
+      return st >= p.numValue && st <= p.numValueEnd;
+    }
     if (p.numValue !== undefined) {
       return compareNum(st, p.op, p.numValue);
     }
@@ -156,6 +197,9 @@ export function matchesFieldPredicate(row: LogRow, index: LogIndex, r: number, p
   if (k === 'duration' || k === 'time-taken' || k === 'durationms' || k === 'duration_ms' || k === 'latency') {
     const dur = index.duration ? index.duration[r]! : Number(row.values['time-taken'] ?? row.values.duration ?? row.values.durationMs ?? row.values.duration_ms);
     if (!Number.isFinite(dur)) return false;
+    if (p.op === '..' && p.numValue !== undefined && p.numValueEnd !== undefined) {
+      return dur >= p.numValue && dur <= p.numValueEnd;
+    }
     if (p.numValue !== undefined) {
       return compareNum(dur, p.op, p.numValue);
     }
@@ -206,6 +250,10 @@ export function matchesFieldPredicate(row: LogRow, index: LogIndex, r: number, p
     }
   }
   if (val === null || val === undefined) return false;
+  if (p.op === '..' && p.numValue !== undefined && p.numValueEnd !== undefined) {
+    const n = typeof val === 'number' ? val : Number(val);
+    return Number.isFinite(n) && n >= p.numValue && n <= p.numValueEnd;
+  }
   if (typeof val === 'number' && p.numValue !== undefined && p.op !== '=') {
     return compareNum(val, p.op, p.numValue);
   }

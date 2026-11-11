@@ -21,10 +21,10 @@ var w=window.open(L+"/?source=kudu&app="+encodeURIComponent(app),"logsift-kudu")
 if(!w){alert("Logsift: allow pop-ups for this site, then click the bookmark again.");return;}
 window.__logsiftKudu=w;
 var okPath=function(p){return typeof p==="string"&&/^[\\w .()\\/-]*$/.test(p)&&!p.split("/").some(function(x){return /^[. ]+$/.test(x);});};
-var LOGEXT=/\\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|gz|zip)$/i,SECRET=/(appsettings|settings|web\\.config|\\.config$|^\\.env|secret|password|passwd|connection-?string|credential|private|(^|[-_.])(keys?|tokens?)[-_.])/i;
-var okDir=function(s){return s[0]==="LogFiles"||s.some(function(x){return /^(.*[-_. ])?logs?$/i.test(x);});};
+var LOGEXT=/\\.(log|txt|csv|tsv|json|jsonl|ndjson|clef|xml|out|err|trace|gz|zip)([._-]\\w+)?$/i,SECRET=/(appsettings|settings|web\\.config|\\.config$|^\\.env|secret|password|passwd|connection-?string|credential|private|(^|[-_.])(keys?|tokens?)[-_.])/i;
+var okDir=function(s){return s[0]==="LogFiles"||s.some(function(x){return !/^(blog|catalog|dialog|prolog|travelog)s?$/i.test(x)&&/^[a-z0-9_-]*logs?$/i.test(x);});};
 var okList=function(p){return okPath(p)&&okDir(p.split("/").filter(Boolean));};
-var okRead=function(p){if(!okPath(p))return false;var s=p.split("/").filter(Boolean),f=s.pop()||"";return LOGEXT.test(f)&&!SECRET.test(f)&&okDir(s);};
+var okRead=function(p){if(!okPath(p))return false;var s=p.split("/").filter(Boolean);if(s.some(function(x){return /^(kudu|git|crashdumps?|detailederrors)$/i.test(x);}))return false;var f=s.pop()||"";return LOGEXT.test(f)&&!SECRET.test(f)&&okDir(s);};
 var vfs=function(p){return "/api/vfs/"+p.split("/").filter(Boolean).map(encodeURIComponent).join("/");};
 window.addEventListener("message",function(e){
 if(e.source!==w||e.origin!==L)return;

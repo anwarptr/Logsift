@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { cleanKuduPath, isKuduLogFolder, KUDU_FOLDERS, KUDU_LIMITS, KuduBridge, KuduDirHandle } from '../live/kudu';
+import {
+  cleanKuduPath,
+  getKuduFilterFn,
+  isKuduLogFolder,
+  KUDU_FOLDERS,
+  KUDU_LIMITS,
+  KuduBridge,
+  KuduDirHandle,
+  type KuduFilterKind,
+} from '../live/kudu';
 import { kuduBookmarklet, kuduScript } from '../live/kuduBookmarklet';
-import { useLogStore } from '../store/logStore';
+import { isAcceptedFile, useLogStore } from '../store/logStore';
 import { copyText } from '../utils/clipboard';
 
 /** Where the bookmark should come from for everyday use. */
@@ -114,6 +123,9 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
   const [state, setState] = useState<ConnectState>({ kind: 'connecting' });
   const [custom, setCustom] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [maxFiles, setMaxFiles] = useState(KUDU_LIMITS.maxFiles);
+  const [maxMb, setMaxMb] = useState(Math.round(KUDU_LIMITS.maxBytes / (1024 * 1024)));
+  const [filterKind, setFilterKind] = useState<KuduFilterKind>('no-eventlog');
   const bridgeRef = useRef<KuduBridge | null>(null);
   const titleRef = useModalFocus<HTMLHeadingElement>();
 
@@ -171,7 +183,12 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
       }
       return;
     }
-    await openFolder(new KuduDirHandle(bridge, path, `${app}: ${path || 'home'}`), { ...KUDU_LIMITS, remember: false });
+    await openFolder(new KuduDirHandle(bridge, path, `${app}: ${path || 'home'}`), {
+      maxFiles,
+      maxBytes: maxMb * 1024 * 1024,
+      remember: false,
+      accept: getKuduFilterFn(filterKind, isAcceptedFile),
+    });
     onClose();
   };
 
@@ -200,7 +217,54 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
         )}
         {(state.kind === 'ready' || state.kind === 'opening') && (
           <>
-            <p className="muted">Choose what to watch. The newest files open first (up to 10 files, 64 MB), then new lines arrive live.</p>
+            <div className="kudu-limit-row">
+              <div className="kudu-limit-group">
+                <label htmlFor="kudu-limit-select" className="muted">
+                  Limit:
+                </label>
+                <select
+                  id="kudu-limit-select"
+                  className="pattern-input small"
+                  value={`${maxFiles}-${maxMb}`}
+                  disabled={state.kind === 'opening'}
+                  onChange={(e) => {
+                    const [f, mb] = e.target.value.split('-').map(Number);
+                    if (f && mb) {
+                      setMaxFiles(f);
+                      setMaxMb(mb);
+                    }
+                  }}
+                >
+                  <option value="5-32">Up to 5 files (32 MB) — Minimal</option>
+                  <option value="10-64">Up to 10 files (64 MB) — Recommended</option>
+                  <option value="25-128">Up to 25 files (128 MB)</option>
+                  <option value="50-256">Up to 50 files (256 MB) — Slower</option>
+                  <option value="100-512">Up to 100 files (512 MB) — Slowest</option>
+                </select>
+              </div>
+              <div className="kudu-limit-group">
+                <label htmlFor="kudu-filter-select" className="muted">
+                  Filter:
+                </label>
+                <select
+                  id="kudu-filter-select"
+                  className="pattern-input small"
+                  value={filterKind}
+                  disabled={state.kind === 'opening'}
+                  onChange={(e) => setFilterKind(e.target.value as KuduFilterKind)}
+                >
+                  <option value="no-eventlog">Exclude eventlog.xml (Recommended)</option>
+                  <option value="all">All files (including eventlog.xml)</option>
+                  <option value="app-only">App logs only (.txt, .log, .json)</option>
+                  <option value="iis-only">IIS / Web server logs only (u_ex*.log)</option>
+                  <option value="eventlog-only">eventlog.xml only</option>
+                </select>
+              </div>
+            </div>
+            <p className="muted">
+              Choose what to watch. The newest files open first (up to {maxFiles} files, {maxMb} MB)
+              {filterKind === 'no-eventlog' ? ', excluding heavy eventlog.xml' : ''}, then new lines arrive live.
+            </p>
             <div className="kudu-folders">
               {KUDU_FOLDERS.map((f) => (
                 <button key={f.path} type="button" className="samples-item" disabled={state.kind === 'opening'} onClick={() => void watch(f.path)}>
@@ -237,7 +301,11 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
                 {error}
               </p>
             )}
-            {state.kind === 'opening' && <p aria-live="polite">Reading the newest files…</p>}
+            {state.kind === 'opening' && (
+              <p aria-live="polite" className="muted" style={{ marginTop: '8px' }}>
+                Reading files (up to {maxFiles} files)… {maxFiles >= 50 ? 'Downloading many files over Kudu may take up to a minute.' : ''}
+              </p>
+            )}
           </>
         )}
       </div>

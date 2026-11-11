@@ -45,6 +45,8 @@ describe('listFolder', () => {
     w3.add(new FakeFile('u_ex261027.log'));
     w3.add(new FakeFile('old.zip'));
     root.add(new FakeDir('.git')).add(new FakeFile('x.log'));
+    root.add(new FakeDir('CrashDumps')).add(new FakeFile('w3wp_2740.log'));
+    root.add(new FakeDir('kudu')).add(new FakeFile('trace.xml'));
     let d = root;
     for (let i = 0; i <= MAX_DEPTH; i++) d = d.add(new FakeDir(`d${i}`));
     d.add(new FakeFile('too-deep.log'));
