@@ -404,7 +404,7 @@ export const useLogStore = create<LogState>()((set, get) => {
     }
 
     // Rows of several files are interleaved by time; keep the selection on the same row.
-    const selected = s.selectedId === null ? null : s.rows[s.selectedId];
+    const selected = s.selectedId === null ? null : (s.rows.find((r) => r.id === s.selectedId) ?? s.rows[s.selectedId]);
     let rows = s.files.length > 1 || liveInit?.kind === 'folder' ? mergeAppend(s.rows, buf.rows) : appendRows(s.rows, buf.rows);
     const maxRows = s.live?.maxRows ?? 50_000;
     if (rows.length > maxRows) {
@@ -688,10 +688,10 @@ export const useLogStore = create<LogState>()((set, get) => {
 
     showInFullLog(id) {
       const s = get();
-      const row = s.rows[id];
+      const row = s.rows.find((r) => r.id === id) ?? s.rows[id];
       if (!row || !hasActiveFilters(s.filters)) return;
       // Sorting would scatter the neighbours, so file order is shown until filters are restored.
-      set({ paused: { filters: s.filters, sort: s.sort, lineNo: row.lineNo }, filters: EMPTY_FILTERS, sort: null, selectedId: id, tab: 'rows' });
+      set({ paused: { filters: s.filters, sort: s.sort, lineNo: row.lineNo }, filters: EMPTY_FILTERS, sort: null, selectedId: row.id, tab: 'rows' });
     },
 
     restoreFilters() {

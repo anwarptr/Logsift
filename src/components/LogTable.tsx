@@ -128,14 +128,18 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
   // When the selection changes from elsewhere (e.g. "jump to row" in insights), scroll it into view.
   useEffect(() => {
     if (selectedId === null) return;
-    const current = indices[cursor];
-    if (current === selectedId) return;
-    const pos = indices.indexOf(selectedId);
+    const currentIdx = indices[cursor];
+    const currentRow = currentIdx !== undefined ? rows[currentIdx] : undefined;
+    if (currentRow && (currentRow.id === selectedId || currentIdx === selectedId)) return;
+    const pos = indices.findIndex((idx) => {
+      const r = rows[idx];
+      return r ? r.id === selectedId || idx === selectedId : false;
+    });
     if (pos >= 0) {
       setCursor(pos);
       virtualizer.scrollToIndex(pos, { align: 'center' });
     }
-  }, [selectedId, indices]);
+  }, [selectedId, indices, rows, cursor, virtualizer]);
 
   const onRowClick = useCallback(
     (id: number, viewIndex: number) => {
@@ -150,7 +154,10 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
     const next = Math.max(0, Math.min(indices.length - 1, to));
     setCursor(next);
     virtualizer.scrollToIndex(next, { align: 'auto' });
-    if (selectedId !== null) select(indices[next]!);
+    if (selectedId !== null) {
+      const r = rows[indices[next]!];
+      if (r) select(r.id);
+    }
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -176,8 +183,9 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
         break;
       case 'Enter':
       case ' ': {
-        const id = indices[cursor];
-        if (id !== undefined) select(id);
+        const idx = indices[cursor];
+        const r = idx !== undefined ? rows[idx] : undefined;
+        if (r) select(r.id);
         break;
       }
       default:
@@ -270,7 +278,7 @@ export function LogTable({ rows, indices, columns, highlight }: LogTableProps) {
                 widths={widths}
                 highlight={highlight}
                 zone={zone}
-                selected={row.id === selectedId}
+                selected={row.id === selectedId || idx === selectedId}
                 active={vi.index === cursor}
                 slow={typeof dur === 'number' && dur > slowMs}
                 top={vi.start}

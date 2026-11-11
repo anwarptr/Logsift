@@ -189,15 +189,48 @@ export function KuduConnectDialog({ onClose }: { onClose: () => void }) {
       remember: false,
       accept: getKuduFilterFn(filterKind, isAcceptedFile),
     });
+    if (typeof window !== 'undefined' && window.location.search.includes('source=kudu')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('source');
+      url.searchParams.delete('app');
+      window.history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + (url.hash || ''));
+    }
     onClose();
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal kudu-dialog" role="dialog" aria-modal="true" aria-labelledby="kudu-connect-title">
-        <h2 id="kudu-connect-title" ref={titleRef} tabIndex={-1}>
-          {state.kind === 'ready' || state.kind === 'opening' ? `Watch ${state.kind === 'ready' ? state.app : ''} logs` : 'Azure App Service (Kudu)'}
-        </h2>
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && state.kind !== 'opening') onClose();
+      }}
+    >
+      <div
+        className="modal kudu-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="kudu-connect-title"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && state.kind !== 'opening') {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 id="kudu-connect-title" ref={titleRef} tabIndex={-1} style={{ margin: 0 }}>
+            {state.kind === 'ready' || state.kind === 'opening' ? `Watch ${state.kind === 'ready' ? state.app : ''} logs` : 'Azure App Service (Kudu)'}
+          </h2>
+          <button
+            type="button"
+            className="btn small ghost"
+            aria-label="Close dialog"
+            disabled={state.kind === 'opening'}
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
         {state.kind === 'connecting' && <p aria-live="polite">Connecting to the Kudu tab…</p>}
         {state.kind === 'failed' && (
           <>

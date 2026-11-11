@@ -405,6 +405,23 @@ describe('row details shortcuts', () => {
     act(() => useLogStore.getState().select(null));
   });
 
+  it('opens row details correctly even when row id differs from array index', async () => {
+    await loadSample();
+    const { useLogStore } = await import('../../src/store/logStore');
+    const originalRows = useLogStore.getState().rows;
+    const offsetRows = originalRows.map((r, i) => ({ ...r, id: i + 1000 }));
+    act(() => useLogStore.setState({ rows: offsetRows }));
+
+    act(() => useLogStore.getState().select(1005));
+    const targetRow = offsetRows[5]!;
+    const details = screen.getByRole('complementary', { name: `Details for line ${targetRow.lineNo}` });
+    expect(details).toBeTruthy();
+    expect(details.textContent).toContain(`Line ${targetRow.lineNo}`);
+
+    act(() => useLogStore.getState().select(null));
+    expect(screen.queryByRole('complementary', { name: /Details for line/ })).toBeNull();
+  });
+
   it('n and Shift+N step through error rows', async () => {
     await loadSample();
     const { useLogStore } = await import('../../src/store/logStore');

@@ -24,8 +24,13 @@ const TRACE_KEYS = [
 
 export function RowDetailPanel() {
   const selectedId = useLogStore((s) => s.selectedId);
-  const row = useLogStore((s) => (s.selectedId === null ? undefined : s.rows[s.selectedId]));
   const rows = useLogStore((s) => s.rows);
+  const row = useLogStore((s) => {
+    if (s.selectedId === null) return undefined;
+    const direct = s.rows[s.selectedId];
+    if (direct && direct.id === s.selectedId) return direct;
+    return s.rows.find((r) => r.id === s.selectedId) ?? direct;
+  });
   const schema = useLogStore((s) => s.schema);
   const select = useLogStore((s) => s.select);
   // A failed request trace's raw text is its event timeline, not a line from the file.
@@ -72,8 +77,10 @@ export function RowDetailPanel() {
     setCopied(ok ? (kind === 'json' ? 'Copied JSON' : isTrace ? 'Copied timeline' : 'Copied raw line') : 'Copy failed');
   }
 
-  const startIdx = Math.max(0, row.id - 3);
-  const endIdx = Math.min(rows.length - 1, row.id + 3);
+  const rowIndex = rows.findIndex((r) => r.id === row.id);
+  const currentIdx = rowIndex >= 0 ? rowIndex : row.id;
+  const startIdx = Math.max(0, currentIdx - 3);
+  const endIdx = Math.min(rows.length - 1, currentIdx + 3);
   const surroundings = rows.slice(startIdx, endIdx + 1);
 
   return (

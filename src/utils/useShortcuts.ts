@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { isErrorRow, type LogIndex } from '../filters/logIndex';
+import type { LogRow } from '../parser';
 import { useLogStore } from '../store/logStore';
 
 export function isEditable(el: Element | null): boolean {
@@ -12,14 +13,23 @@ export function isEditable(el: Element | null): boolean {
  * The next (dir 1) or previous (dir -1) error row after the selected one, in display order,
  * wrapping around; from the top (or bottom) when nothing is selected. null when there are no errors.
  */
-export function nextErrorRow(indices: Uint32Array, index: LogIndex, selectedId: number | null, dir: 1 | -1): number | null {
+export function nextErrorRow(
+  indices: Uint32Array,
+  index: LogIndex,
+  selectedId: number | null,
+  dir: 1 | -1,
+  rows?: LogRow[],
+): number | null {
   const n = indices.length;
   if (n === 0) return null;
-  const pos = selectedId === null ? -1 : indices.indexOf(selectedId);
+  const pos =
+    selectedId === null
+      ? -1
+      : indices.findIndex((idx) => (rows ? rows[idx]?.id === selectedId || idx === selectedId : idx === selectedId));
   const start = pos < 0 ? (dir === 1 ? -1 : n) : pos;
   for (let k = 1; k <= n; k++) {
-    const id = indices[(((start + dir * k) % n) + n) % n]!;
-    if (isErrorRow(index, id)) return id;
+    const idx = indices[(((start + dir * k) % n) + n) % n]!;
+    if (isErrorRow(index, idx)) return rows && rows[idx] ? rows[idx]!.id : idx;
   }
   return null;
 }
@@ -46,7 +56,7 @@ export function useShortcuts(indices: Uint32Array, index: LogIndex | null): void
         e.preventDefault();
         state.setFocusMode(!state.focusMode);
       } else if ((e.key === 'n' || e.key === 'N') && !typing && view.current.index && state.tab === 'rows') {
-        const id = nextErrorRow(view.current.indices, view.current.index, state.selectedId, e.shiftKey ? -1 : 1);
+        const id = nextErrorRow(view.current.indices, view.current.index, state.selectedId, e.shiftKey ? -1 : 1, state.rows);
         if (id !== null) {
           e.preventDefault();
           state.select(id);

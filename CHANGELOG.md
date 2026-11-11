@@ -28,6 +28,8 @@ What changed in each Logsift release, newest first. The in-app Help shows the la
 
 ### Fixed
 
+- **Row details in Kudu & live folder logs**: fixed row detail panel not displaying when clicking rows after loading logs via Kudu or live folder watch where row IDs deviate from array indices.
+- **Kudu dialog enhancements**: added backdrop click, Escape key shortcut, and close button to dismiss the dialog, and cleaned up `?source=kudu` query parameters after connection.
 - **Bounded concurrency for remote logs**: downloads up to 100 files in batches of 4 with a 60s timeout, avoiding browser socket starvation on Kudu.
 - **Fault-tolerant loading**: partial load success if individual files time out or fail.
 - **Excluded platform diagnostic folders**: automatically ignores `CrashDumps/`, `DetailedErrors/`, `kudu/`, and `git/` from folder scans so old crash dumps or deployment traces are never picked up as logs.
