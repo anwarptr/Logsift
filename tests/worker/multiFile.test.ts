@@ -243,3 +243,71 @@ describe('JSON files', () => {
     expect(isJsonDocument(text, final)).toBe(expected);
   });
 });
+
+describe('heterogeneous multi-format parsing', () => {
+  it('parses files of different formats (IIS + JSON lines + Syslog) into a unified chronological log', async () => {
+    const iisText =
+      '#Software: Microsoft Internet Information Services 10.0\n' +
+      '#Fields: date time cs-method cs-uri-stem sc-status time-taken\n' +
+      '2026-10-27 10:00:00 GET /api/v1/checkout 200 120\n' +
+      '2026-10-27 10:00:10 POST /api/v1/pay 500 450\n';
+
+    const jsonText =
+      '{"timestamp": "2026-10-27T10:00:05Z", "level": "info", "message": "checkout started", "userId": 42}\n' +
+      '{"timestamp": "2026-10-27T10:00:12Z", "level": "error", "message": "gateway timeout", "exception": "TimeoutError"}\n';
+
+    const syslogText =
+      '2026-10-27T10:00:08Z myhost worker[123]: background task started\n';
+
+    const batches: StreamBatch[] = [];
+    const summary = await streamParseSources(
+      [
+        { name: 'web-iis.log', blob: new Blob([iisText]) },
+        { name: 'app.jsonl', blob: new Blob([jsonText]) },
+        { name: 'system.log', blob: new Blob([syslogText]) },
+      ],
+      { onBatch: (b) => batches.push(b) },
+    );
+
+    expect(summary.detected).toBe('mixed');
+    expect(summary.format).toBe('mixed');
+    expect(summary.files).toEqual(['app.jsonl', 'system.log', 'web-iis.log']);
+
+    const allRows = batches.flatMap((b) => b.rows);
+    const allMalformed = batches.flatMap((b) => b.malformed);
+    expect(allMalformed).toHaveLength(0);
+    expect(allRows).toHaveLength(5);
+
+    // Schema should contain columns from all formats plus sourceFile and logFormat
+    const schema = summary.schema;
+    expect(schema.some((c) => c.key === 'sourceFile')).toBe(true);
+    expect(schema.some((c) => c.key === 'logFormat')).toBe(true);
+    expect(schema.some((c) => c.key === 'cs-method')).toBe(true);
+    expect(schema.some((c) => c.key === 'level')).toBe(true);
+    expect(schema.some((c) => c.key === 'host')).toBe(true);
+
+    // Check row format tags
+    const iisRow = allRows.find((r) => r.values.sourceFile === 'web-iis.log')!;
+    expect(iisRow.values.logFormat).toBe('IIS W3C Extended');
+    expect(iisRow.values['cs-method']).toBe('GET');
+
+    const jsonRow = allRows.find((r) => r.values.sourceFile === 'app.jsonl')!;
+    expect(jsonRow.values.logFormat).toBe('JSON lines');
+    expect(jsonRow.values.level).toBe('info');
+    expect(jsonRow.values.message).toBe('checkout started');
+
+    const syslogRow = allRows.find((r) => r.values.sourceFile === 'system.log')!;
+    expect(syslogRow.values.logFormat).toBe('Syslog');
+    expect(syslogRow.values.host).toBe('myhost');
+
+    // Interleave chronologically with mergeByTime
+    const merged = mergeByTime(allRows);
+    expect(merged.map((r) => [r.values.sourceFile, r.values.logFormat, r.values['cs-uri-stem'] ?? r.values.message])).toEqual([
+      ['web-iis.log', 'IIS W3C Extended', '/api/v1/checkout'],
+      ['app.jsonl', 'JSON lines', 'checkout started'],
+      ['system.log', 'Syslog', 'background task started'],
+      ['web-iis.log', 'IIS W3C Extended', '/api/v1/pay'],
+      ['app.jsonl', 'JSON lines', 'gateway timeout'],
+    ]);
+  });
+});

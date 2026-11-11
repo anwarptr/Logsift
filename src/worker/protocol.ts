@@ -27,6 +27,8 @@ export type WorkerResponse =
       lines: number;
       elapsedMs: number;
       timeZone: LogTimeZone;
+      format?: LogFormat;
+      detected?: LogFormat;
       /** Live: bytes at the end of each file not read yet (an unfinished last line). */
       held?: Record<string, number>;
     }

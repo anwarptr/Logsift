@@ -1,4 +1,4 @@
-import { createParser, detectFormat, looksLikeXml, SOURCE_COLUMN } from '../parser';
+import { createParser, detectFormat, looksLikeXml, SOURCE_COLUMN, FORMAT_COLUMN, FORMAT_LABELS, SchemaBuilder, splitLines } from '../parser';
 import type { ColumnDef, LineParser, LogFormat, LogRow, LogTimeZone, MalformedRow, ParsedChunk } from '../parser';
 import { isZipName, listZipEntries, zipEntryData, ZipError } from './unzip';
 
@@ -284,31 +284,26 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
   const fileStates = new Map<string, unknown>();
   const encodings = new Map<string, TextEncodingName>();
 
-  let parser: LineParser | null = null;
-  let format: LogFormat = 'generic';
-  let detected: LogFormat = 'generic';
+  const masterSchema = new SchemaBuilder();
+  const parsers = new Map<string, LineParser>();
+  const fileFormats = new Map<string, LogFormat>();
+  const formatsSeen = new Set<LogFormat>();
+  let nextRowId = 0;
+  let nextMalformedId = 0;
+
   let current = '';
   let bytesRead = 0;
   let reportedBytes = 0;
   let lines = 0;
-  let pending = 0;
   let totalRows = 0;
   let totalMalformed = 0;
 
-  const schema = () => (multi ? [...parser!.schema(), SOURCE_COLUMN] : parser!.schema());
-
-  const emit = (final: boolean) => {
-    if (!parser) return;
-    const chunk = final ? parser.finish() : parser.drain();
-    pending = 0;
-    if (chunk.rows.length === 0 && chunk.malformed.length === 0 && chunk.meta.length === 0) return;
-    if (multi) {
-      for (const r of chunk.rows) r.values.sourceFile = current;
-      for (const m of chunk.malformed) m.file = current;
-    }
-    totalRows += chunk.rows.length;
-    totalMalformed += chunk.malformed.length;
-    opts.onBatch({ ...chunk, schema: schema() });
+  const currentSchema = () => {
+    const isMultiFormat = formatsSeen.size > 1;
+    const cols = masterSchema.list();
+    if (multi && !cols.some((c: ColumnDef) => c.key === SOURCE_COLUMN.key)) cols.push(SOURCE_COLUMN);
+    if ((multi || isMultiFormat) && !cols.some((c: ColumnDef) => c.key === FORMAT_COLUMN.key)) cols.push(FORMAT_COLUMN);
+    return cols;
   };
 
   const progress = (force: boolean) => {
@@ -319,8 +314,9 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
 
   for (const input of inputs) {
     current = input.name;
-    // Later files reuse the parser (created on the first lines); tell it this file's date.
-    (parser as LineParser | null)?.setDefaultDate?.(input.modified);
+    let fileParser: LineParser | null = null;
+    let fileFormat: LogFormat = 'generic';
+
     // Chosen from the file's first bytes (UTF-8, or UTF-16 from Windows tools).
     let encoding: TextEncodingName = 'utf-8';
     let decoder: TextDecoder | null = null;
@@ -328,6 +324,7 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     let started = false;
     let lineNo = 0;
     let sinceEmit = 0;
+    let pending = 0;
 
     const checkStart = (text: string): string => {
       if (started || text.length === 0) return text;
@@ -342,20 +339,51 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
       return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
     };
 
+    const emit = (final: boolean) => {
+      if (!fileParser) return;
+      const chunk = final ? fileParser.finish() : fileParser.drain();
+      pending = 0;
+      if (chunk.rows.length === 0 && chunk.malformed.length === 0 && chunk.meta.length === 0) return;
+      masterSchema.addAll(fileParser.schema());
+      const isMultiFormat = formatsSeen.size > 1;
+      for (const r of chunk.rows) {
+        r.id = nextRowId++;
+        if (multi) r.values.sourceFile = current;
+        if (multi || isMultiFormat) {
+          r.values.logFormat = FORMAT_LABELS[fileFormat] ?? fileFormat;
+        }
+      }
+      for (const m of chunk.malformed) {
+        m.id = nextMalformedId++;
+        if (multi) m.file = current;
+      }
+      totalRows += chunk.rows.length;
+      totalMalformed += chunk.malformed.length;
+      opts.onBatch({ ...chunk, schema: currentSchema() });
+    };
+
     const feedLines = (ls: string[], guess: () => LogFormat) => {
-      if (!parser) {
-        detected = guess();
-        format = opts.format ?? detected;
-        parser = createParser(format, opts.pattern);
-        parser.setDefaultDate?.(input.modified);
-        opts.onStart?.(format, detected, files);
+      if (!fileParser) {
+        const detectedFormat = guess();
+        fileFormat = opts.format && opts.format !== 'mixed' ? opts.format : detectedFormat;
+        fileParser = createParser(fileFormat, opts.pattern);
+        fileParser.setDefaultDate?.(input.modified);
+        parsers.set(input.name, fileParser);
+        fileFormats.set(input.name, fileFormat);
+        formatsSeen.add(detectedFormat);
+        masterSchema.addAll(fileParser.schema());
+        if (parsers.size === 1) {
+          const det = detectedFormat;
+          const fmt = opts.format && opts.format !== 'mixed' ? opts.format : detectedFormat;
+          opts.onStart?.(fmt, det, files);
+        }
       }
       for (let i = 0; i < ls.length; i++) {
         let l = ls[i]!;
         if (l.charCodeAt(l.length - 1) === 13) l = l.slice(0, -1);
         lineNo++;
         lines++;
-        parser.pushLine(l, lineNo);
+        fileParser.pushLine(l, lineNo);
         if (++pending >= batchRows) emit(false);
       }
     };
@@ -442,12 +470,13 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     } else if (started) {
       // Live: an unfinished last line is still being written; it is read with the next append.
       // (Nothing after the final newline is not a line, so it isn't counted either.)
-      if (opts.live && input.plain && rest !== '' && parser) held[input.name] = byteLength(rest, encoding);
-      else if (rest !== '' || !parser) feed(rest);
+      if (opts.live && input.plain && rest !== '' && fileParser) held[input.name] = byteLength(rest, encoding);
+      else if (rest !== '' || !fileParser) feed(rest);
     }
     // Before finish(), which resets it for the next file.
     if (opts.live) {
-      fileStates.set(input.name, (parser as LineParser | null)?.fileState?.());
+      const p = fileParser as LineParser | null;
+      fileStates.set(input.name, p?.fileState?.());
       encodings.set(input.name, encoding);
     }
     emit(true);
@@ -455,28 +484,78 @@ export async function streamParseSources(sources: LogSource[], opts: StreamParse
     lineNos.set(input.name, lineNo);
   }
 
-  if (!parser) throw new ParseError(multi ? 'The files are empty.' : 'The file is empty.');
+  if (parsers.size === 0) throw new ParseError(multi ? 'The files are empty.' : 'The file is empty.');
   if (totalRows === 0 && totalMalformed === 0) {
     throw new ParseError(multi ? 'No log entries were found in these files.' : 'No log entries were found in this file.');
   }
-  const p = parser as LineParser;
+
+  const isMultiFormat = formatsSeen.size > 1;
+  const detected: LogFormat = isMultiFormat ? 'mixed' : ([...formatsSeen][0] ?? 'generic');
+  const format: LogFormat = opts.format && opts.format !== 'mixed' ? opts.format : detected;
+
+  const timeZones = [...parsers.values()].map((p) => p.timeZone());
+  let timeZone = timeZones[0]!;
+  if (timeZones.some((tz) => tz.kind !== timeZone.kind || tz.offsetMin !== timeZone.offsetMin)) {
+    timeZone = { kind: 'mixed', offsetMin: 0, source: 'Mixed time zones across files' };
+  }
+  const assumedDates: string[] = [];
+  for (const tz of timeZones) {
+    if (tz.assumedDate) {
+      for (const part of tz.assumedDate.split(' – ')) {
+        if (!assumedDates.includes(part)) assumedDates.push(part);
+      }
+    }
+  }
+  if (assumedDates.length > 1) {
+    assumedDates.sort();
+    timeZone = { ...timeZone, assumedDate: `${assumedDates[0]} – ${assumedDates[assumedDates.length - 1]}` };
+  } else if (assumedDates.length === 1) {
+    timeZone = { ...timeZone, assumedDate: assumedDates[0] };
+  }
+
+  const firstParser = [...parsers.values()][0]!;
+  const session: LiveSession = {
+    parsers,
+    fileFormats,
+    format: opts.format,
+    pattern: opts.pattern,
+    masterSchema,
+    nextRowId,
+    nextMalformedId,
+    multi,
+    lineNos,
+    fileStates,
+    encodings,
+    openFile: null,
+    get parser() {
+      return [...this.parsers.values()][0] ?? firstParser;
+    },
+  };
+
   return {
     format,
     detected,
-    schema: schema(),
+    schema: currentSchema(),
     files,
     lines,
     rows: totalRows,
     malformed: totalMalformed,
-    timeZone: p.timeZone(),
-    ...(opts.live ? { held, session: { parser: p, multi, lineNos, fileStates, encodings, openFile: null } } : {}),
+    timeZone,
+    ...(opts.live ? { held, session } : {}),
   };
 }
 
 
 /** The state kept after a live parse, so lines appended to the files later continue the same log. */
 export interface LiveSession {
-  parser: LineParser;
+  readonly parser: LineParser;
+  parsers: Map<string, LineParser>;
+  fileFormats: Map<string, LogFormat>;
+  format?: LogFormat;
+  pattern?: string;
+  masterSchema: SchemaBuilder;
+  nextRowId: number;
+  nextMalformedId: number;
   /** Rows get a `sourceFile` value (several files, or a folder). */
   multi: boolean;
   /** Lines read so far per file, to number appended lines. */
@@ -506,26 +585,61 @@ export function appendToSession(
   onBatch: (batch: StreamBatch) => void,
   final: boolean | 'lines' = false,
 ): { consumed: number; timeZone: LogTimeZone } {
-  const { parser } = session;
-  const schema = () => (session.multi ? [...parser.schema(), SOURCE_COLUMN] : parser.schema());
-  const emit = (file: string, chunk: ParsedChunk) => {
-    if (session.multi) {
-      for (const r of chunk.rows) r.values.sourceFile = file;
-      for (const m of chunk.malformed) m.file = file;
+  const encoding = sniffEncoding(bytes) ?? session.encodings.get(name) ?? 'utf-8';
+  if (!session.encodings.has(name)) session.encodings.set(name, encoding);
+
+  let parser = session.parsers.get(name);
+  let fileFormat = session.fileFormats.get(name);
+  if (!parser) {
+    if (session.format && session.format !== 'mixed') {
+      fileFormat = session.format;
+    } else {
+      const sampleText = new TextDecoder(encoding).decode(bytes.subarray(0, 4096));
+      fileFormat = detectFormat(splitLines(sampleText));
     }
-    if (chunk.rows.length || chunk.malformed.length || chunk.meta.length) onBatch({ ...chunk, schema: schema() });
+    parser = createParser(fileFormat, session.pattern);
+    parser.setDefaultDate?.(modified);
+    session.parsers.set(name, parser);
+    session.fileFormats.set(name, fileFormat);
+  }
+
+  const currentSchema = () => {
+    const isMultiFormat = session.parsers.size > 1;
+    const cols = session.masterSchema.list();
+    if (session.multi && !cols.some((c) => c.key === SOURCE_COLUMN.key)) cols.push(SOURCE_COLUMN);
+    if ((session.multi || isMultiFormat) && !cols.some((c) => c.key === FORMAT_COLUMN.key)) cols.push(FORMAT_COLUMN);
+    return cols;
   };
+
+  const emit = (file: string, chunk: ParsedChunk) => {
+    session.masterSchema.addAll(parser!.schema());
+    const isMultiFormat = session.parsers.size > 1;
+    for (const r of chunk.rows) {
+      r.id = session.nextRowId++;
+      if (session.multi) r.values.sourceFile = file;
+      if (session.multi || isMultiFormat) {
+        r.values.logFormat = FORMAT_LABELS[fileFormat!] ?? fileFormat!;
+      }
+    }
+    for (const m of chunk.malformed) {
+      m.id = session.nextMalformedId++;
+      if (session.multi) m.file = file;
+    }
+    if (chunk.rows.length || chunk.malformed.length || chunk.meta.length) {
+      onBatch({ ...chunk, schema: currentSchema() });
+    }
+  };
+
   /** Close the open file's last entry, keeping its state for later lines. */
   const close = (file: string) => {
-    session.fileStates.set(file, parser.fileState?.());
-    emit(file, parser.finish());
+    const p = session.parsers.get(file);
+    if (p) {
+      session.fileStates.set(file, p.fileState?.());
+      emit(file, p.finish());
+    }
     session.openFile = null;
   };
 
-  // Usually the file's encoding; text appended in another one (UTF-16 from PowerShell's `>>` to a
-  // UTF-8 log) is recognised by its own bytes.
-  const encoding = sniffEncoding(bytes) ?? session.encodings.get(name) ?? 'utf-8';
-  if (!session.encodings.has(name)) session.encodings.set(name, encoding);
   const end = final === true ? bytes.length : lastLineEnd(bytes, encoding);
   if (end === 0 && !final) return { consumed: 0, timeZone: parser.timeZone() };
   if (session.openFile !== null && session.openFile !== name) close(session.openFile);

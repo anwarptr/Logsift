@@ -2,7 +2,7 @@ import type { LogTimeZone } from './timezone';
 
 export type { LogTimeZone } from './timezone';
 
-export type LogFormat = 'iis' | 'freb' | 'winevent' | 'apache' | 'alb' | 'jsonl' | 'logfmt' | 'syslog' | 'csv' | 'generic' | 'custom';
+export type LogFormat = 'iis' | 'freb' | 'winevent' | 'apache' | 'alb' | 'jsonl' | 'logfmt' | 'syslog' | 'csv' | 'generic' | 'custom' | 'mixed';
 
 export const FORMAT_LABELS: Record<LogFormat, string> = {
   iis: 'IIS W3C Extended',
@@ -16,6 +16,7 @@ export const FORMAT_LABELS: Record<LogFormat, string> = {
   csv: 'CSV / TSV',
   generic: 'Generic text',
   custom: 'Custom pattern…',
+  mixed: 'Mixed formats',
 };
 
 export type CellValue = string | number | boolean | null;
@@ -45,6 +46,8 @@ export type ColumnRole =
   | 'logger'
   | 'healthCheck'
   | 'scm'
+  /** The log format (e.g. IIS, JSON, Syslog) when several formats are opened together. */
+  | 'format'
   /** Which file a row came from, when several files are opened together. */
   | 'source';
 

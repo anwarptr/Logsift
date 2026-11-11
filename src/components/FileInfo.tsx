@@ -7,7 +7,7 @@ import { useLogIndex } from '../store/useView';
 import { formatBytes, formatDuration, formatNumber } from '../utils/format';
 import { differsFromLocal, formatOffset, localZoneName, logDisplayZone, zoneOffsetAt } from '../utils/timezone';
 
-const FORMATS = Object.keys(FORMAT_LABELS) as LogFormat[];
+const FORMATS = (Object.keys(FORMAT_LABELS) as LogFormat[]).filter((f) => f !== 'mixed');
 
 function zoneText(tz: LogTimeZone): string {
   switch (tz.kind) {

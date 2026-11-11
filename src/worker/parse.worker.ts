@@ -59,6 +59,8 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       lines: summary.lines,
       elapsedMs: performance.now() - started,
       timeZone: summary.timeZone,
+      format: summary.format,
+      detected: summary.detected,
       held: summary.held,
     });
   } catch (err) {

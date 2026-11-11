@@ -6,6 +6,12 @@ What changed in each Logsift release, newest first. The in-app Help shows the la
 
 ### New
 
+- **Heterogeneous multi-format log ingestion**:
+  - Open and watch multiple files of different formats simultaneously (e.g. IIS W3C access logs, application JSON lines, and Syslog).
+  - Independent per-file format detection: each file is parsed with its dedicated parser instead of forcing a single shared parser.
+  - Unified dynamic schema: merges shared fields (`timestamp`, `level`, `status`, `duration`, `uri`, `message`) while preserving format-specific columns without column collisions.
+  - Chronological interleaving: correlates web server traffic with backend application errors on a single unified timeline.
+  - Format badges and facets: filter by format (`IIS W3C Extended`, `JSON lines`, etc.) or source file directly in the sidebar, with format tags in row details.
 - **Live Watch capabilities & Kudu filters**:
   - Configurable file limits (5, 10, 25, 50, or up to 100 files; 32 to 512 MB).
   - Filter presets (*Exclude eventlog.xml*, *All files*, *App logs only*, *IIS logs only*, and *eventlog.xml only*).

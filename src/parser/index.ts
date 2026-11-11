@@ -14,7 +14,7 @@ import type { LineParser, LogFormat, LogRow, MalformedRow, ParseResult } from '.
 
 export * from './types';
 export { detectFormat, looksLikeXml } from './detectFormat';
-export { SOURCE_COLUMN } from './schema';
+export { SOURCE_COLUMN, FORMAT_COLUMN, SchemaBuilder } from './schema';
 export { IIS_TIME_ZONE, OffsetTracker, parseZoneSuffix } from './timezone';
 
 /** `pattern` is the layout for the 'custom' format (see custom.ts). */
@@ -39,6 +39,7 @@ export function createParser(format: LogFormat, pattern?: string): LineParser {
     case 'csv':
       return createCsvParser();
     case 'generic':
+    case 'mixed':
       return createGenericParser();
     case 'custom':
       return createCustomParser(pattern ?? '');

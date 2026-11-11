@@ -90,7 +90,7 @@ export interface Comparison {
 }
 
 /** Columns whose new values are not news (every row has its own). */
-const SKIP_NEW_VALUES = new Set(['sourceFile']);
+const SKIP_NEW_VALUES = new Set(['sourceFile', 'logFormat']);
 const NEW_VALUES_SHOWN = 5;
 
 /** Minutes of `r` that the log (minTs…maxTs) covers; at least one second. */

@@ -10,6 +10,11 @@ export class SchemaBuilder {
     if (!this.cols.has(def.key)) this.cols.set(def.key, { ...def });
   }
 
+  /** Add all given column definitions into the schema in order. */
+  addAll(defs: readonly ColumnDef[]): void {
+    for (const def of defs) this.add(def);
+  }
+
   has(key: string): boolean {
     return this.cols.has(key);
   }
@@ -51,3 +56,6 @@ export const TIMESTAMP_COLUMN: ColumnDef = { key: 'timestamp', label: 'timestamp
 
 /** Added when several files are parsed together: the file each row came from. */
 export const SOURCE_COLUMN: ColumnDef = { key: 'sourceFile', label: 'source file', type: 'string', role: 'source', derived: true };
+
+/** Added when several files or formats are parsed together: the format of each row. */
+export const FORMAT_COLUMN: ColumnDef = { key: 'logFormat', label: 'format', type: 'string', role: 'format', derived: true };

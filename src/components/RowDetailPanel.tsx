@@ -89,6 +89,7 @@ export function RowDetailPanel() {
         <h2>
           Line {row.lineNo.toLocaleString()}
           {typeof row.values.sourceFile === 'string' && <span className="detail-file"> · {row.values.sourceFile}</span>}
+          {typeof row.values.logFormat === 'string' && <span className="detail-format"> · {row.values.logFormat}</span>}
         </h2>
         <button
           ref={closeRef}

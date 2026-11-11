@@ -533,6 +533,8 @@ export const useLogStore = create<LogState>()((set, get) => {
           break;
         case 'done':
           set((s) => ({
+            format: msg.format ?? s.format,
+            detectedFormat: msg.detected ?? s.detectedFormat,
             // Several files: interleave their rows by time (each file is already in order).
             rows: s.files.length > 1 ? mergeByTime(s.rows) : s.rows,
             status: 'ready',
