@@ -8,7 +8,8 @@ What changed in each Logsift release, newest first. The in-app Help shows the la
 
 - **Distributed Trace Waterfall**:
   - Automatically correlates log entries sharing a trace or request ID across multiple files and services into an interactive chronological waterfall timeline.
-  - Cross-format trace ID normalization supports W3C Trace Context (`traceparent`), AWS X-Ray (`Root=1-...`), Jaeger/Uber (`<trace-id>:<span-id>:...`), Serilog compact format (`@tr`, `@sp`), and standard identifiers (`trace_id`, `request_id`, `correlation_id`, `x-request-id`).
+  - Cross-format trace ID normalization supports W3C Trace Context (`traceparent`), AWS X-Ray (`Root=1-...`), Jaeger/Uber (`<trace-id>:<span-id>:...`), Azure Application Insights (`operation_Id`), Serilog compact format (`@tr`, `@sp`), and standard identifiers (`trace_id`, `request_id`, `correlation_id`, `x-request-id`).
+  - Prioritizes root transaction IDs over secondary span IDs, with $O(1)$ set-based trace matching.
   - Embedded inline waterfall in the Row Details panel displaying relative start offsets (`+X ms`), service badges, action descriptions, HTTP status tags, explicit durations, and error indicators.
   - 1-click navigation to select and highlight corresponding rows directly in the main log table.
   - Full-screen visual timeline modal featuring a proportional time ruler, live span search/filtering, active span inspector, and formatted Markdown table export for GitHub issues, Jira tickets, and incident triage.

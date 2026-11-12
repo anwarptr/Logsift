@@ -2,10 +2,13 @@ import type { CellValue, LogRow } from '../parser';
 import { formatNumber, formatTimestamp } from './format';
 import { type DisplayZone, UTC_ZONE } from './timezone';
 
-export const TRACE_KEYS = [
+export const ROOT_TRACE_KEYS = [
   'trace-id',
   'traceid',
   'trace_id',
+  'operation_id',
+  'operationid',
+  'operation-id',
   '@tr',
   'traceparent',
   'x-amzn-trace-id',
@@ -14,12 +17,20 @@ export const TRACE_KEYS = [
   'x-request-id',
   'correlationid',
   'correlation_id',
-  'spanid',
-  'span_id',
-  '@sp',
   'x-b3-traceid',
   'uber-trace-id',
 ];
+
+export const SPAN_KEYS = [
+  'spanid',
+  'span_id',
+  'operation_parentid',
+  'operationparentid',
+  '@sp',
+];
+
+export const TRACE_KEYS = [...ROOT_TRACE_KEYS, ...SPAN_KEYS];
+const TRACE_KEY_SET = new Set(TRACE_KEYS);
 
 /** Extract the normalized trace ID from W3C traceparent, AWS Root, or raw string. */
 export function normalizeTraceId(raw: unknown): string {
@@ -43,11 +54,19 @@ export function normalizeTraceId(raw: unknown): string {
   return s;
 }
 
-/** Find the first trace entry in a row's values. */
+/** Find the first trace entry in a row's values, prioritizing root trace IDs over span IDs. */
 export function extractTraceEntry(values: Record<string, CellValue>): [string, string] | null {
-  for (const [k, v] of Object.entries(values)) {
-    if (typeof v === 'string' && v.trim().length > 0 && TRACE_KEYS.includes(k.toLowerCase())) {
-      return [k, v.trim()];
+  const entries = Object.entries(values);
+  for (const [k, v] of entries) {
+    const s = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
+    if (s && ROOT_TRACE_KEYS.includes(k.toLowerCase())) {
+      return [k, s];
+    }
+  }
+  for (const [k, v] of entries) {
+    const s = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
+    if (s && SPAN_KEYS.includes(k.toLowerCase())) {
+      return [k, s];
     }
   }
   return null;
@@ -81,8 +100,16 @@ export interface TraceWaterfallData {
 
 /** Check whether a row has an error status or error log level. */
 export function isRowError(r: LogRow): boolean {
-  const st = Number(r.values['sc-status'] ?? r.values.status ?? r.values.statusCode ?? r.values.status_code);
+  const st = Number(
+    r.values['sc-status'] ??
+      r.values.status ??
+      r.values.statusCode ??
+      r.values.status_code ??
+      r.values.resultCode ??
+      r.values.resultcode,
+  );
   if (Number.isFinite(st) && st >= 400) return true;
+  if (r.values.success === false || r.values.success === 'False' || r.values.success === 'false') return true;
   const lv = String(r.values.level ?? r.values.severity ?? r.values.lvl ?? r.values.loglevel ?? '').toLowerCase();
   return lv.startsWith('err') || lv.startsWith('fatal') || lv.startsWith('crit');
 }
@@ -129,8 +156,9 @@ export function buildTraceWaterfallData(
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]!;
     for (const [k, v] of Object.entries(r.values)) {
-      if (typeof v === 'string' && TRACE_KEYS.includes(k.toLowerCase())) {
-        if (normalizeTraceId(v) === normTarget) {
+      if (TRACE_KEY_SET.has(k.toLowerCase())) {
+        const strVal = typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '';
+        if (strVal && normalizeTraceId(strVal) === normTarget) {
           matchedRows.push(r);
           break;
         }
@@ -165,6 +193,9 @@ export function buildTraceWaterfallData(
       r.values.service ??
         r.values.app ??
         r.values.application ??
+        r.values.cloud_RoleName ??
+        r.values.cloud_rolename ??
+        r.values.roleName ??
         r.values.sourceFile ??
         r.values.logFormat ??
         'Service',
@@ -177,6 +208,10 @@ export function buildTraceWaterfallData(
     const uri = r.values['cs-uri-stem'] ?? r.values.uri ?? r.values.url;
     if (method && uri) {
       action = `${method} ${uri}`;
+    } else if (typeof r.values.name === 'string' && r.values.name.trim().length > 0) {
+      action = r.values.name.trim();
+    } else if (typeof r.values.operation_Name === 'string' && r.values.operation_Name.trim().length > 0) {
+      action = r.values.operation_Name.trim();
     } else if (typeof r.values.message === 'string' && r.values.message.trim().length > 0) {
       action = r.values.message.split('\n')[0]!.trim();
     } else if (typeof r.values.msg === 'string' && r.values.msg.trim().length > 0) {
@@ -185,7 +220,14 @@ export function buildTraceWaterfallData(
       action = r.raw.slice(0, 90).trim();
     }
 
-    const st = Number(r.values['sc-status'] ?? r.values.status ?? r.values.statusCode ?? r.values.status_code);
+    const st = Number(
+      r.values['sc-status'] ??
+        r.values.status ??
+        r.values.statusCode ??
+        r.values.status_code ??
+        r.values.resultCode ??
+        r.values.resultcode,
+    );
     const status = Number.isFinite(st) ? st : null;
     const lv = r.values.level ?? r.values.severity ?? r.values.lvl;
     const level = typeof lv === 'string' ? lv.toUpperCase() : null;

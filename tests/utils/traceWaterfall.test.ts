@@ -34,11 +34,23 @@ describe('normalizeTraceId', () => {
 describe('extractTraceEntry', () => {
   it('identifies trace keys regardless of case', () => {
     expect(extractTraceEntry({ TRACE_ID: 'tx-1' })).toEqual(['TRACE_ID', 'tx-1']);
+    expect(extractTraceEntry({ operation_Id: 'op-999' })).toEqual(['operation_Id', 'op-999']);
     expect(extractTraceEntry({ '@tr': '4bf92f3577b34da6a3ce929d0e0e4736' })).toEqual(['@tr', '4bf92f3577b34da6a3ce929d0e0e4736']);
     expect(extractTraceEntry({ 'x-amzn-trace-id': 'Root=1-abc' })).toEqual(['x-amzn-trace-id', 'Root=1-abc']);
     expect(extractTraceEntry({ traceparent: '00-abc-def-01' })).toEqual(['traceparent', '00-abc-def-01']);
     expect(extractTraceEntry({ requestId: 'r-100' })).toEqual(['requestId', 'r-100']);
+    expect(extractTraceEntry({ requestId: 1042 })).toEqual(['requestId', '1042']);
     expect(extractTraceEntry({ other: 'val' })).toBeNull();
+  });
+
+  it('prioritizes root trace ID over secondary span IDs', () => {
+    // When both span_id and trace_id appear, trace_id is selected regardless of object key order
+    expect(extractTraceEntry({ span_id: 'span-99', trace_id: 'root-42' })).toEqual(['trace_id', 'root-42']);
+    expect(extractTraceEntry({ operation_parentid: 'parent-1', operation_id: 'op-root' })).toEqual([
+      'operation_id',
+      'op-root',
+    ]);
+    expect(extractTraceEntry({ span_id: 'span-only' })).toEqual(['span_id', 'span-only']);
   });
 });
 
@@ -129,6 +141,21 @@ describe('buildTraceWaterfallData', () => {
     });
 
     expect(data!.totalDurationMs).toBe(250); // span 0 ended at 1250ms (1000 + 250)
+  });
+
+  it('correlates Azure Application Insights rows using operation_Id', () => {
+    const opId = 'd4c8a2e1f0b3';
+    const rows: LogRow[] = [
+      row(0, 1000, { operation_Id: opId, cloud_RoleName: 'frontend-app', name: 'GET /checkout', duration: 300, resultCode: '200' }),
+      row(1, 1050, { operation_Id: opId, cloud_RoleName: 'order-api', name: 'POST /orders', duration: 120, resultCode: '500', success: false }),
+    ];
+    const data = buildTraceWaterfallData(rows, opId, 'operation_Id');
+    expect(data).not.toBeNull();
+    expect(data!.services).toEqual(['frontend-app', 'order-api']);
+    expect(data!.spans[0]!.action).toBe('GET /checkout');
+    expect(data!.spans[1]!.action).toBe('POST /orders');
+    expect(data!.spans[1]!.isError).toBe(true);
+    expect(data!.spans[1]!.status).toBe(500);
   });
 
   it('correctly extracts row duration and error status helpers', () => {
