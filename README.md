@@ -1,6 +1,7 @@
-# Logsift
+# Logsift — browser-based log viewer and analyzer
 
-Sift through your logs in the browser. Logsift is a client-side web app for exploring IIS W3C logs and failed
+Sift through your logs in the browser. Logsift is a free, open-source log viewer and log analyzer that runs
+entirely client-side, for exploring IIS W3C logs and failed
 request traces, Windows Event Log exports, Apache/Nginx, AWS ALB/ELB access logs, Serilog, Python, Java (logback, log4j, Spring Boot), JSON
 (including pino, Docker, Google Cloud Logging, and AWS CloudWatch), logfmt, syslog, CSV and plain-text log files — and any other layout you describe with a
 custom pattern.
