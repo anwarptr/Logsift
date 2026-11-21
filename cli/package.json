@@ -20,7 +20,13 @@
     "kubectl",
     "docker",
     "serilog",
-    "iis"
+    "iis",
+    "log analyzer",
+    "live tail",
+    "log stream",
+    "nginx",
+    "json logs",
+    "syslog"
   ],
   "type": "module",
   "bin": {
